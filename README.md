@@ -15,3 +15,21 @@ separated values", i.e. the values in each line are separated by special charact
 uses the semicolon ; as its standard separator. The advantage of the csv format is that 
 usual table programs such as _Excel_ (by MS) or _Calc_ (by Libre Office) will display the data as table
 and on the other hand its data can be processed as text with usual search or comparison programs.
+
+
+Version history:
+
+2020-06-11:  
+initial version without GUI
+
+2020-07-08:  
+GUI added, German language only
+    
+2020-11-30:  
+some new features of transmitter version 5.03, bugfixes
+    
+2021-01-16:  
+English language added, bugfixes
+    
+2021-03-17:  
+compatibility with transmitter version 5.03 improved, bugfixes
