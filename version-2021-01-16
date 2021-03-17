@@ -1,5 +1,12 @@
-jemoview; version 2021-01-16
+jemoview; version 2021-03-17
  
-- kleine Verbesserungen und Erweiterungen
-- Texte enger an Jeti Begriffen ausgerichtet
-- Sprache wahlweise deutsch oder englisch
+- Limits und Balancer in Servo Zuordnung übernommen
+- Verzögerung mit korrekten Sekunden Werten gefüllt
+- 24ch aus Common anzeigen (ist 24 Kanal Multimode aktiv aus Drahtlosmodus)
+- Nummerierung Flugphasen wie Jeti (aber Standard an erster Position statt an letzter)
+- Nummerierung Stoppuhren wie Jeti
+- Butterfly Feineinstellung komplett
+- Bild und Hintergrund gelistet
+- logische Schalter Verzögerung und Ramp/Step angezeigt
+- bei Funktion, Servo, Stoppuhr und Flugphase als Geber/ Schalter wird Label ebenfalls angezeigt 
+
