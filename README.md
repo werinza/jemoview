@@ -1,3 +1,4 @@
+ 
 # jemoview
 Jeti Model Viewer
 
@@ -33,3 +34,6 @@ English language added, bugfixes
     
 2021-03-17:  
 compatibility with transmitter version 5.03 improved, bugfixes
+
+2021-03-23:  
+crash barrier zefix introduced, bugfixes

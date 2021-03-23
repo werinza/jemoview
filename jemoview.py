@@ -4,12 +4,12 @@
 #
 # jeti model viewer
 global version
-version = 'jemoview; version 2021-03-17'
+version = 'jemoview; version 2021-03-23'
 #
 # program extracts all relevant information from an input jeti transmitter file (.jsn)
 # and prints it in a csv format using ';' as standard delimiter, suitable for excel/calc programs
 #
-# Copyright (c) 2020, werinza (Klaus)
+# Copyright (c) 2020, werinza (nikolausi / Klaus)
 # All Rights Reserved, Open Source MIT license applies to this program and related works
 #
 
@@ -26,7 +26,7 @@ global aferatg_txt
 aferatg_txt = ['Quer', 'Klappen', 'Höhe', 'Seite', 'Störkl.', 'Drossel', 'Fahrwerk',  
         'Ailerons', 'Flaps', 'Elevator', 'Rudder', 'Airbrake.', 'Throttle', 'Gear']
 
-global fileout  # current output file is set in selectInput
+global fileout      # current output file is set in selectInput
 
 # following globals are set in  extract()
 global aferatgt     # list of servo count for main functions defined by aferatg_txt, plus tail features at end
@@ -34,7 +34,6 @@ global funktionen   # list of labels of used functions
 global flightmolist # list of labels of used flight modes
 global flightmoid   # list of id of used flight modes
 global flightmoseq  # list of flight modes as displayed by transmitter
-global curvetypes   # list of all types of jeti defined curves, depend on language 
 global luaid        # list of ids of lua apps
 global sensorlist   # list of sensors and their measurements
 global servolist    # list of labels of used servos
@@ -53,6 +52,20 @@ def checkBala(aList):
             status = 1
     return getYesNo(status)
 
+
+# evaluate curvetype
+def getCurve(aInt):
+    if options['language'] == 'de':
+        curvetypes = ['Standard', 'konstant', 'x>0', 'x<0', '|x|', '+positiv', '-negativ',
+            'symmetrisch', '3-Punkt', '5-Punkt', '7-Punkt', '9-Punkt', 'Gyro']
+    else:
+        curvetypes = ['Standard', 'Constant', 'x>0', 'x<0', '|x|', '+positive', '-negative',
+            '±symmetric', '3-point', '5-point', '7-point', '9-point', 'Gyro']
+    if aInt < len(curvetypes):
+        return curvetypes[aInt]
+    else:
+        return zefix(1)
+    
         
 # getSwitch evaluates the internal switch representation which is a string made of 7 commas and 8 integers, example "12,0,0,1,1,-4000,-1,4"
 # switch is on first or seventh position
@@ -67,13 +80,13 @@ def getSwitch(aString):
     log = [
         'Log1', 'Log2', 'Log3', 'Log4', 'Log5', 'Log6', 'Log7', 'Log8', 'Log9',
         'Log10', 'Log11', 'Log12', 'Log13', 'Log14', 'Log15', 'Log16', 'Log17',
-        'Log18', 'Log19', 'Log20', 'Log21', 'Log22', 'Log23', 'Log24', '?01',
-        '?02', '?03', '?04', '?05', '?06', '?07', '?08'
+        'Log18', 'Log19', 'Log20', 'Log21', 'Log22', 'Log23', 'Log24', '?zefix?',
+        '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?'
     ]
     # seventh position, values from  32 to 47, voice commands
     voi = [
         'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10',
-        'V11', 'V12', 'V13', 'V14', 'V15', '?24'
+        'V11', 'V12', 'V13', 'V14', 'V15', '?zefix?'
     ]
     # seventh position, values from 48 to 63, telemetry controls
     mx = [
@@ -82,18 +95,18 @@ def getSwitch(aString):
     ]
     # seventh position, values from 64 to 79, accelerometers, special treatment in getSwitch for 76 -79
     gx = [
-        'GX', 'GY', 'GZ', 'G/L', 'G/R', 'GXL', 'GXR', 'GHi', '?36', '?37',
-        '?38', '?39', 'timer', 'function', 'servo', 'flight mode'
+        'GX', 'GY', 'GZ', 'G/L', 'G/R', 'GXL', 'GXR', 'GHi', '?zefix?', '?zefix?',
+        '?zefix?', '?zefix?', 'timer', 'function', 'servo', 'flight mode'
     ]
     # seventh position, values from 80 to 89, sequencers
     seq = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8', 'Q9', 'Q10']
     # seventh position, values from 90 to 129, CH = channels of ppm inputs, Tr = digital trims, C0 = user apps
     sonst = [
-        'CH1', 'CH2', 'CH3', 'CH4', 'CH5', 'CH6', 'CH7', 'CH8', '?99', '?100',
-        '?101', '?102', '?103', '?104', '?105', '?106', 'Tr1', 'Tr2', 'Tr3',
-        'Tr4', 'Tr5', 'Tr6', '?113', '?114', '?115', '?116', 'C01', 'C02',
-        'C03', 'C04', '?121', '?122', '?123', '?124', '?125', '?126', '?127',
-        'Log.MAX', '?129', '?130'
+        'CH1', 'CH2', 'CH3', 'CH4', 'CH5', 'CH6', 'CH7', 'CH8', '?zefix?', '?zefix?',
+        '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', 'Tr1', 'Tr2', 'Tr3',
+        'Tr4', 'Tr5', 'Tr6', '?zefix?', '?zefix?', '?zefix?', '?zefix?', 'C01', 'C02',
+        'C03', 'C04', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+        'Log.MAX', '?zefix?', '?zefix?'
     ]
     switches7 = log + voi + mx + gx + seq + sonst
 
@@ -142,6 +155,8 @@ def getSwitch(aString):
     # if first position empty, take seventh position
     if switchNo1 == 0:  
         if switchNo7 >= 0:
+            if switches7[switchNo7] == '?zefix?':
+                return zefix(1)
             return switches7[switchNo7]
         else:
             return '-'
@@ -187,6 +202,8 @@ def getYesNo(aInt):
             return 'ja'
         else:
             return 'yes'
+    else:
+        return zefix(1)
 
     
 # print a dictionary, fileout is current output file as set in selectInput
@@ -204,7 +221,7 @@ def setDecPoint(aInt, aValue):
         aInt -= 1
     return aValue
 
-
+    
 # write one of two strings using appropriate language, fileout is current output file as set in selectInput 
 def writeLine(deStr, enStr):
     if options['language'] == 'de':
@@ -227,6 +244,18 @@ def writeEssence(labels, values):
         for ii in range(len(values)):
             fileout.write(labels[ii])
             fileout.write(values[ii])
+
+
+# handle zefix marker
+def zefix(aInt):
+    global zefixmark  # needed to preserve value between calls
+    if aInt == 0:
+        zefixmark = 0
+    if aInt == 1:
+        zefixmark += 1
+        return '?zefix?'
+    if aInt == 2:
+        return zefixmark
 
 
 # following functions are called by extract()
@@ -262,7 +291,7 @@ def alarms(modelData):
         if item['Repeat'] < len(rept):
             rep = rept[item['Repeat']]
         else:
-            rep = '???AL'
+            rep = zefix(1)
         voi = getYesNo(item['Voice'])
         sensor = ''
         parm = ''
@@ -383,9 +412,9 @@ def controls(modelData):  # Sticks/Switches setup (Voreinstellungen)
     # controls, P3 and P4 are swapped due to a probable bug in transmitter
     switches1 = [
         'nix', 'P1', 'P2', 'P4', 'P3', 'P5', 'P6', 'P7', 'P8', 'SA', 'SB',
-        'SC', 'SD', 'SE', 'SF', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'SM', 'SN',
-        'SO', 'SP', '?P9', '?P10'
-    ]
+        'SC', 'SD', 'SE', 'SF', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'P9',
+        'P10', 'SM', 'SN', 'SO', 'SP'
+    ]  
     empty = True
     for item in modelData['Controls']['Data']:  # is liste of dicts
         ind = int(item['ID'])
@@ -429,14 +458,14 @@ def displayedtelemetry(modelData):
         return
     writeLine('\nNummer;Inhalt;Zoom', '\nNumber;Content;Double')
     systemDe = [
-        '?dt00', 'Flugphasen', 'Antenne', '?dt03', 'RX-Spannung', 'Besitzer',
-        '?dt06', 'Jetibox', 'Trim', 'Tx Akku', 'Flugzeit', 'Antenne 900MHz', '?dt12',
-        'Modellbild', '?dt14'
+        '?zefix?', 'Flugphasen', 'Antenne', '?zefix?', 'RX-Spannung', 'Besitzer',
+        '?zefix?', 'Jetibox', 'Trim', 'Tx Akku', 'Flugzeit', 'Antenne 900MHz', '?zefix?',
+        'Modellbild', '?zefix?'
     ]
     systemEn = [
-        '?dt00', 'Flight Modes', 'Antenna', '?dt03', 'Voltage RX', 'User Name',
-        '?dt06', 'Jetibox', 'Trim', 'Tx Battery', 'Model Time', 'Antenna 900MHz', '?dt12',
-        'Model Image', '?dt14'
+        '?zefix?', 'Flight Modes', 'Antenna', '?zefix?', 'Voltage RX', 'User Name',
+        '?zefix?', 'Jetibox', 'Trim', 'Tx Battery', 'Model Time', 'Antenna 900MHz', '?zefix?',
+        'Model Image', '?zefix?'
     ]
     ind = 0
     for item in modelData['Displayed-Telemetry']:  # ist liste von dicts
@@ -473,8 +502,10 @@ def displayedtelemetry(modelData):
             if id < len(systemDe):
                 txtDe = systemDe[id]
                 txtEn = systemEn[id]
+                if txtDe == '?zefix?' or txtEn == '?zefix?':
+                    zefix(1)
             else:
-                txt = '???DT'
+                txt = zefix(1)
             if id == 7:
                 zoom = '-'
             outDe = str(ind) + ';' + txtDe + ';' + zoom
@@ -672,11 +703,7 @@ def flightmodes2(modelData):
         but_qr_d2 = str(item['BrakeDiff'][1])
         but_qr_d3 = str(item['BrakeDiff'][2])
         but_qr_d4 = str(item['BrakeDiff'][3])
-        curtyp = item['BrakeElevCurve']['Curve-Type']
-        if curtyp < len(curvetypes):
-            curve = curvetypes[curtyp]
-        else:
-            curve = '???KT'
+        curve = getCurve(item['BrakeElevCurve']['Curve-Type'])
         but_tun_sw = getSwitch(item['BkAdjustSwitch'])
         but_tun_dif = str(item['BrakeAdjust'][3])
         but_tun_qr = str(item['BrakeAdjust'][0])
@@ -795,12 +822,7 @@ def functionspecs(modelData):
             no_sw = False
         exneg = item['Expo-Neg'][0]
         expos = item['Expo-Pos'][0]
-        curtyp = item['Curve-Type']
-        if curtyp < len(curvetypes):
-            curve = curvetypes[curtyp]
-        else:
-            curve = '???KT'
-
+        curve = getCurve(item['Curve-Type'])
         if flm == flmold:  # continue with same flight mode and append data
             hit = False
             for txt in aferatg_txt:
@@ -898,8 +920,9 @@ def globalstr(modelData):
                 outDe = '\nSender Typ' + ';' + txTyp[value]
                 outEn = '\nTransmitter type' + ';' + txTyp[value]
             else:
-                outDe = '\nSender Typ' + ';' + '???TX'
-                outEn = '\nTransmitter type' + ';' + '???TX'
+                outDe = '\nSender Typ' + ';' + '?zefix?'
+                outEn = '\nTransmitter type' + ';' + '?zefix?'
+                zefix(1)
             writeLine(outDe, outEn)
             continue
         if item == 'TxVers':
@@ -923,8 +946,9 @@ def globalstr(modelData):
                 outDe = '\nModelltyp' + ';' + typDe[ind]
                 outEn = '\nModel type' + ';' + typEn[ind]
             else:
-                outDe = '\nModelltyp' + ';' + '???MT'
-                outEn = '\nModel type' + ';' + '???MT'
+                outDe = '\nModelltyp' + ';' + '?zefix?'
+                outEn = '\nModel type' + ';' + '?zefix?'
+                zefix(1)
             writeLine(outDe, outEn)
             continue
         if item == 'Receiver-ID1' or item == 'Receiver-ID2':
@@ -992,7 +1016,7 @@ def logswitch(modelData):
         if item['Log-Type'] < len(logtyp):
             zutxt = logtyp[item['Log-Type']]
         else:
-            zutxt = '???L'
+            zutxt = zefix(1)
         sw2 = getSwitch(item['Switch2'])
         if enabled != 0 or label != '' or sw1 != '-' or zutxt != '...' or sw2 != '-':
             empty = False
@@ -1017,7 +1041,7 @@ def logswitch(modelData):
                 if item['Value1'] == 0:
                     cond1txt = ''
         else:
-            cond1txt = '???'
+            cond1txt = zefix(1)
         sw2 = getSwitch(item['Switch2'])
         cond2 = item['Cond2']
         if cond2 < len(cond):
@@ -1026,11 +1050,11 @@ def logswitch(modelData):
                 if item['Value2'] == 0:
                     cond2txt = ''
         else:
-            cond2txt = '???'
+            cond2txt = zefix(1)
         if item['Log-Type'] < len(logtyp):
             zutxt = logtyp[item['Log-Type']]
         else:
-            zutxt = '???L'
+            zutxt = zefix(1)
         if 'Up-Type' in item:
             uptyp = '/'
             if item['Up-Type'] == 1:
@@ -1040,9 +1064,9 @@ def logswitch(modelData):
                 dntyp = '|'
             delaya = setDecPoint(1, int(item['Up-Time']))
             delayd = setDecPoint(1, int(item['Dn-Time']))
-            delayout = ';' + uptyp + '  ' + str(delaya) + 's    ' + dntyp + '  ' + str(delayd) + 's'
+            delayout = ';' + uptyp + '  ' + str(delaya) + 's   ' + dntyp + '  ' + str(delayd) + 's'
         else:
-            delayout = ';' + '/  0.0s    \  0.0s'
+            delayout = ';' + '/  0.0s   \  0.0s'
         out = '\nLog' + str(ind + 1) + ';' + label + ';' + enabled + ';' + sw1 + ';' + cond1txt + ';' + sw2 + ';' + cond2txt + ';' + zutxt + delayout
         writeLine(out, out)
 
@@ -1121,9 +1145,13 @@ def mixesmain(modelData):
         outEn = '\n' + von + ';' + auf + ';' + wirkEn + ';' + asymEn
         writeLine(outDe, outEn)
 
-    writeLine('\n\nFreie Mischer: Flugphasen', '\n\nFree Mixes: Flight Modes')
-    writeLine('\nMischer;Flugphase;Wert;Schalter;Kurve;Mix-Ausgabe +;Mix-Ausgabe -;nur vorwärts;Master Link;Slave Link;Trim;Slave Dual-Rate',
-        '\nMix;Flight Mode;Value;Switch;Curve;Mix Output +;Mix Output -;Single direction;Master Link;Slave Link;Trim;Slave Dual-Rate')
+    writeLine('\n\nFreie Mischer: Flugphasen;;;;;Verzögerung', '\n\nFree Mixes: Flight Modes;;;;;Delay')
+    writeLine('\nMischer;Flugphase;Master-Wert;Schalter;Kurve;-Basis+       -Schalter+;Mix-Ausgabe +;Mix-Ausgabe -;nur vorwärts;Master Link;Slave Link;Trim;Slave Dual-Rate',
+        '\nMix;Flight Mode;Master Value;Switch;Curve;-Source+    -Switch+;Mix Output +;Mix Output -;Single direction;Master Link;Slave Link;Trim;Slave Dual-Rate')
+    if options['language'] == 'de':
+        links = ['nein', '+  ja', '-  ja']
+    else:
+        links = ['no', '+  yes', '-  yes']
     for ii in range(anz_mix):
         for jj in range(flightmolist[10] + 1):
             item = modelData['Mixes-Main']['Data'][ii]
@@ -1136,6 +1164,12 @@ def mixesmain(modelData):
             flugphase = flightmolist[int(dic['Flight-Mode'])]
             wert = dic['Intensity']
             sw = getSwitch(dic['Switch'])
+            curve = getCurve(dic['Curve-Type'])
+            delay1 = setDecPoint(1, int(dic['DelayN']))
+            delay2 = setDecPoint(1, int(dic['DelayP']))
+            delay3 = setDecPoint(1, int(dic['DelaySwN']))
+            delay4 = setDecPoint(1, int(dic['DelaySwP']))
+            delayout = str(delay1) + 's  ' + str(delay2) + 's   ' + str(delay3) + 's  ' + str(delay4) + 's'
             mp1 = str(dic['S-Output'][0])
             mp2 = str(dic['S-Output'][1])
             mp3 = str(dic['S-Output'][2])
@@ -1168,18 +1202,19 @@ def mixesmain(modelData):
                         mixpo = mp1 + ' / ' + mp2 + ' / ' + mp3 + ' / ' + mp4
                         mixno = mn1 + ' / ' + mn2 + ' / ' + mn3 + ' / ' + mn4
             vorw = getYesNo(dic['Direction'])
-            ml = getYesNo(dic['M-Link'])
-            sl = getYesNo(dic['S-Link'])
+            if dic['M-Link'] < len(links):
+                ml = links[dic['M-Link']]
+            else:
+                ml = zefix(1)
+            if dic['S-Link'] < len(links):
+                sl = links[dic['S-Link']]
+            else:
+                sl = zefix(1)
             trim = getYesNo(dic['M-Trim'])
             sdr = getYesNo(dic['S-DR'])
-            curtyp = dic['Curve-Type']
-            if curtyp < len(curvetypes):
-                curve = curvetypes[curtyp]
-            else:
-                curve = '???KT'
             if item[2] == 1:  # is global
                 flugphase = 'Global'
-            out = out + ';' + flugphase + ';' + str(wert) + ';' + sw + ';' + curve + ';' + mixpo + ';' + mixno + ';' + vorw + ';' + ml + ';' + sl + ';' + trim + ';' + sdr
+            out = out + ';' + flugphase + ';' + str(wert) + ';' + sw + ';' + curve + ';' + delayout + ';' + mixpo + ';' + mixno + ';' + vorw + ';' + ml + ';' + sl + ';' + trim + ';' + sdr
             writeLine('\n' + out, '\n' + out)
             if item[2] == 1:  # is global
                 break
@@ -1228,33 +1263,33 @@ def sequence(modelData):
 
 
 def servos1(modelData): # set servolist[]
-    # servo labels as defined by jeti
+    # servo labels as defined by jeti, codes start at 257 (Querruder1/Aileron1)
     servoNamesDe = ['Querruder1', 'Querruder2', 'Querruder3', 'Querruder4', 'Klappe1',
         'Klappe2', 'Klappe3', 'Klappe4', 'Seite1', 'Seite2', 'Höhe1', 'Höhe2',
-        '?269', '?270', 'Drossel1', 'Drossel2', 'Drossel3', 'Drossel4',
+        '?zefix?', '?zefix?', 'Drossel1', 'Drossel2', 'Drossel3', 'Drossel4',
         'Fahrwerk1', 'Fahrwerk2', 'Fahrwerk3', 'Fahrwerk4', 'Störkl.1',
-        'Störkl.2', 'Roll', 'Nick', 'Pitch', '?284', 'Heck', '?286',
-        'Gyroempf.', '?288', '?289', '?290', '?291', '?292', '?293', '?294',
-        '?295', '?296', '?297', '?298', '?299', '?300', '?301', '?302', '?303',
-        '?304', 'Gyroempf.2', 'Gyroempf.3', 'Gimbal R', 'Gimbal P', 'Gimbal Y',
-        'Mode', '?311', '?312', '?313', '?314', '?315', '?316', '?317', '?318',
-        '?319', '?320']
+        'Störkl.2', 'Roll', 'Nick', 'Pitch', '?zefix?', 'Heck', '?zefix?',
+        'Gyroempf.', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+        '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+        '?zefix?', 'Gyroempf.2', 'Gyroempf.3', 'Gimbal R', 'Gimbal P', 'Gimbal Y',
+        'Mode', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+        '?zefix?', '?zefix?']
     servoNamesEn = ['Aileron1', 'Aileron2', 'Aileron3', 'Aileron4', 'Flap1',
         'Flap2', 'Flap3', 'Flap4', 'Rudder1', 'Rudder2', 'Elevator1', 'Elevator2',
-        '?269', '?270', 'Throttle1', 'Throttle2', 'Throttle3', 'Throttle4',
+        '?zefix?', '?zefix?', 'Throttle1', 'Throttle2', 'Throttle3', 'Throttle4',
         'Gear1', 'Gear2', 'Gear3', 'Gear4', 'Airbrake1',
-        'Airbrake2', 'Roll', 'Elevator', 'Pitch', '?284', 'Yaw', '?286',
-        'Gyro sens.', '?288', '?289', '?290', '?291', '?292', '?293', '?294',
-        '?295', '?296', '?297', '?298', '?299', '?300', '?301', '?302', '?303',
-        '?304', 'Gyro sens.2', 'Gyro sens.3', 'Gimbal R', 'Gimbal P', 'Gimbal Y',
-        'Mode', '?311', '?312', '?313', '?314', '?315', '?316', '?317', '?318',
-        '?319', '?320']
+        'Airbrake2', 'Roll', 'Elevator', 'Pitch', '?zefix?', 'Yaw', '?zefix?',
+        'Gyro sens.', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+        '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+        '?zefix?', 'Gyro sens.2', 'Gyro sens.3', 'Gimbal R', 'Gimbal P', 'Gimbal Y',
+        'Mode', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+        '?zefix?', '?zefix?']
 
     if options['language'] == 'de':
         servoNames = servoNamesDe
     else:
         servoNames = servoNamesEn
-    # servo codes between 288 and 304(?) are used for user defined names and stored in servoOther
+    # servo codes between 288 and 304 are used for user defined names and stored in servoOther
     servoOther = 16 * ['nix']  # non-standard names
     # code does not work correctly if above assumptions are wrong (might happen if 24 non standard servos used)
     for item in modelData['Servos']['Data']:  # is list of dicts
@@ -1284,10 +1319,12 @@ def servos1(modelData): # set servolist[]
                 if servo - 257 < len(servoNames):
                     name = servoNames[servo - 257]
                 else:
-                    name = '???SN'
+                    name = '?zefix?'
             else:  # other servos
                 name = str(servoOther[servo - 288])
             servolist[ind] = name
+            if name == '?zefix?':
+                zefix(1)
 
 
 def servos2(modelData):
@@ -1306,7 +1343,7 @@ def servos2(modelData):
         reverse = ';' + getYesNo(item['Servo-Reverse'])
         delayp = setDecPoint(1, int(item['Delay-Positive']))
         delayn = setDecPoint(1, int(item['Delay-Negative']))
-        delayout = ';' + str(delayp) + 's    ' + str(delayn) + 's'
+        delayout = ';' + str(delayp) + 's   ' + str(delayn) + 's'
         if 'Curve' in item:
             balancer = checkBala(item['Curve'])
         if name != 'nix':
@@ -1501,7 +1538,7 @@ def timers2(modelData):
         if mode < len(reset):
             resmod = reset[mode]
         else:
-            resmod = '??reset'
+            resmod = zefix(1)
         writeLine('\nZurücksetzen-Timer; beim Start:;' + resmod, '\nTimers reset; at power up:;' + resmod)
     
     if len(modelData['Timers']['Data']) == 0:
@@ -1526,12 +1563,12 @@ def timers2(modelData):
         if typ < len(timtyp):
             typo = timtyp[typ]
         else:
-            typo = '??typ'
+            typo = zefix(1)
         report = item['Report-Type']
         if report < len(reptyp):
             reporto = reptyp[report]
         else:
-            reporto = '??report'
+            reporto = zefix(1)
         sw = getSwitch(item['Switch'])
         if 'Sw-Rst' in item:
             reset = getSwitch(item['Sw-Rst'])
@@ -1572,8 +1609,9 @@ def typespecific(modelData):
                 aferatgt[0] = wing_qr[ind]
                 aferatgt[1] = wing_wk[ind]
             else:
-                outDe = 'Tragfläche' + ';' + '???TS'
-                outEn = 'Wing type' + ';' + '???TS'
+                outDe = 'Tragfläche' + ';' + '?zefix?'
+                outEn = 'Wing type' + ';' + '?zefix?'
+                zefix(1)
                 aferatgt[0] = 0
                 aferatgt[1] = 0
         if item == 'Tail-Type':
@@ -1584,8 +1622,9 @@ def typespecific(modelData):
                 aferatgt[2] = tail_hr[ind]
                 aferatgt[3] = tail_sr[ind]
             else:
-                outDe = 'Leitwerk' + ';' + '???TT'
-                outEn = 'Tail type' + ';' + '???TT'
+                outDe = 'Leitwerk' + ';' + '?zefix?'
+                outEn = 'Tail type' + ';' + '?zefix?'
+                zefix(1)
                 aferatgt[2] = 0
                 aferatgt[3] = 0
             if options['language'] == 'de':
@@ -1656,7 +1695,7 @@ def vario(modelData):
     if mode < len(modes):
         modet = modes[mode]
     else:
-        modet = '???VM'
+        modet = zefix(1)
     sw = getSwitch(modelData['Vario']['Switch'])
     setting = modelData['Vario']['Setting']  # is list of dicts
     for ii in range(len(modelData['Vario']['Setting'])):
@@ -1723,32 +1762,24 @@ def extract(modelData):
     global flightmolist
     global flightmoid
     global flightmoseq
-    global curvetypes
     global luaid
     global sensorlist
     global servolist
     global stopwatch
     global stopwatchid
-    
 
     # set initial values for all global arrays
+    aferatgt = [0, 0, 0, 0, 0, 0, 0, 0, '']
     funktionen = 51 * ['nix']
     flightmolist = 11 * ['nix']
     flightmoid = 11 * ['nix']
     flightmoseq = 11 * ['nix']
-    # curvetypes must be set here because language might change during program execution
-    if options['language'] == 'de':
-        curvetypes = ['Standard', 'konstant', 'x>0', 'x<0', '|x|', '+positiv', '-negativ',
-            'symmetrisch', '3-Punkt', '5-Punkt', '7-Punkt', '9-Punkt', 'Gyro']
-    else:
-        curvetypes = ['Standard', 'Constant', 'x>0', 'x<0', '|x|', '+positive', '-negative',
-            '±symmetric', '3-point', '5-point', '7-point', '9-point', 'Gyro']
     luaid = 31 * [0]
     sensorlist = {}
     servolist = 25 * ['nix']
     stopwatch = 11 * ['nix']
     stopwatchid = 11 * ['nix']
-    aferatgt = [0, 0, 0, 0, 0, 0, 0, 0, '']
+    zefix(0)
         
     # evaluate all dicts of top level
     globalstr(modelData)
@@ -1790,10 +1821,11 @@ def extract(modelData):
     #usermenu(modelData)           # low priority
 
 
-#------------------------   function to select model files and then call extract function for each selected model    ------------------------------
+#------------------------   function to select model files and then call extract function for each selected model  ----
 def selectInput():
-    # this global must be declared here again to avoid variable shadowing
+    # this global must be declared here again to avoid variable shadowing (because it is set)
     global fileout
+    
     initdir = os.getcwd()
     if options['language'] == 'de':
         txt1 = 'eine oder mehrere jsn Modell Dateien auswählen'
@@ -1809,7 +1841,7 @@ def selectInput():
         multiple=True)
     if not filelist:
         return None
-
+    
     for item in filelist:
         fileName = item.name  # is a fully qualified name
         print('\ninput', fileName)
@@ -1881,7 +1913,14 @@ def selectInput():
             print(out)
             tk.messagebox.showinfo(title='jemoview', message=out)
             continue
-            
+        
+        if zefix(2) > 0:
+            if options['language'] == 'de':
+                out = 'Datenlücke bei Modell\n' + fileName + '\nbitte Modell im jetiforum.de einstellen'
+            else:
+                out = 'Missing data for model\n' + fileName + '\nplease post model at jetiforum.de'
+            print(out)
+            tk.messagebox.showinfo(title='jemoview', message=out)
         print('output', filecsv)
         fileout.close()
     
