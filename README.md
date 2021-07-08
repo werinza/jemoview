@@ -37,3 +37,6 @@ compatibility with transmitter version 5.03 improved, bugfixes
 
 2021-03-23:  
 crash barrier "zefix" introduced, bugfixes
+
+2021-07-08:  
+accelerometer evaluated, list of controls and switches added, bugfixes

@@ -3,9 +3,6 @@
 # aufruf: python3 jemoview.py oder python jemoview.py (je nachdem ob python V3 als python3 oder python installiert ist)
 #
 # jeti model viewer
-global version
-version = 'jemoview; version 2021-03-23'
-#
 # program extracts all relevant information from an input jeti transmitter file (.jsn)
 # and prints it in a csv format using ';' as standard delimiter, suitable for excel/calc programs
 #
@@ -15,37 +12,38 @@ version = 'jemoview; version 2021-03-23'
 
 import json
 import os
+import re
 import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-global options
-options = {'language' : 'de', 'csv' : 'model-folder'}
+version = 'jemoview; version 2021-07-08'
 
-global aferatg_txt
-aferatg_txt = ['Quer', 'Klappen', 'Höhe', 'Seite', 'Störkl.', 'Drossel', 'Fahrwerk',  
-        'Ailerons', 'Flaps', 'Elevator', 'Rudder', 'Airbrake.', 'Throttle', 'Gear']
+options = {'language': 'de',
+           'csv': 'model-folder'}
 
-global fileout      # current output file is set in selectInput
+aferatg_txt = ['Quer', 'Klappen', 'Höhe', 'Seite', 'Störkl.', 'Drossel', 'Fahrwerk',
+               'Ailerons', 'Flaps', 'Elevator', 'Rudder', 'Airbrake.', 'Throttle', 'Gear']
 
-# following globals are set in  extract()
-global aferatgt     # list of servo count for main functions defined by aferatg_txt, plus tail features at end
-global funktionen   # list of labels of used functions
-global flightmolist # list of labels of used flight modes
-global flightmoid   # list of id of used flight modes
-global flightmoseq  # list of flight modes as displayed by transmitter
-global luaid        # list of ids of lua apps
-global sensorlist   # list of sensors and their measurements
-global servolist    # list of labels of used servos
-global stopwatch    # list of labels of used timers
-global stopwatchid  # list of id of used timers
+# following globals are reset in extractDict() for each call
+aferatgt = []       # list of servo count for main functions defined by aferatg_txt, plus tail features at end
+funktionen = []     # list of labels of used functions
+flightmolist = []   # list of labels of used flight modes
+flightmoid = []     # list of id of used flight modes
+flightmoseq = []    # list of flight modes as displayed by transmitter
+luaid = []          # list of ids of lua apps
+sensordict = {}     # dict of sensors and their measurements
+servolist = []      # list of labels of used servos
+stopwatch = []      # list of labels of used timers
+stopwatchid = []    # list of id of used timers
+hasAccel = False    # true if transmitter has accelerometer
 
 
 # --------------------------------     utility functions    --------------------------------------
 
 # check if servo balancer used
 def checkBala(aList):
-# check all elements of list if value == 0
+    '''check all elements of alist if value == 0'''
     status = 0
     for jj in range(len(aList)):
         if aList[jj] != 0:
@@ -57,57 +55,45 @@ def checkBala(aList):
 def getCurve(aInt):
     if options['language'] == 'de':
         curvetypes = ['Standard', 'konstant', 'x>0', 'x<0', '|x|', '+positiv', '-negativ',
-            'symmetrisch', '3-Punkt', '5-Punkt', '7-Punkt', '9-Punkt', 'Gyro']
+                      'symmetrisch', '3-Punkt', '5-Punkt', '7-Punkt', '9-Punkt', 'Gyro']
     else:
         curvetypes = ['Standard', 'Constant', 'x>0', 'x<0', '|x|', '+positive', '-negative',
-            '±symmetric', '3-point', '5-point', '7-point', '9-point', 'Gyro']
+                      '±symmetric', '3-point', '5-point', '7-point', '9-point', 'Gyro']
     if aInt < len(curvetypes):
         return curvetypes[aInt]
     else:
         return zefix(1)
-    
-        
+
+
 # getSwitch evaluates the internal switch representation which is a string made of 7 commas and 8 integers, example "12,0,0,1,1,-4000,-1,4"
-# switch is on first or seventh position
+# switch is at first or seventh position (with first position = 0), switch position itself at 6
 def getSwitch(aString):
     # first position, but P3 and P4 are swapped due to a probable bug in transmitter, proportional and pyhysical switches
-    switches1 = [
-        'nix', 'P1', 'P2', 'P4', 'P3', 'P5', 'P6', 'P7', 'P8', 'SA', 'SB',
-        'SC', 'SD', 'SE', 'SF', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'P9',
-        'P10', 'SM', 'SN', 'SO', 'SP'
-    ]  
+    switches1 = ['nix', 'P1', 'P2', 'P4', 'P3', 'P5', 'P6', 'P7', 'P8', 'SA', 'SB',
+                 'SC', 'SD', 'SE', 'SF', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'P9',
+                 'P10', 'SM', 'SN', 'SO', 'SP']
     # seventh position, values from  0 to 31, logical switches
-    log = [
-        'Log1', 'Log2', 'Log3', 'Log4', 'Log5', 'Log6', 'Log7', 'Log8', 'Log9',
-        'Log10', 'Log11', 'Log12', 'Log13', 'Log14', 'Log15', 'Log16', 'Log17',
-        'Log18', 'Log19', 'Log20', 'Log21', 'Log22', 'Log23', 'Log24', '?zefix?',
-        '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?'
-    ]
+    log = ['Log1', 'Log2', 'Log3', 'Log4', 'Log5', 'Log6', 'Log7', 'Log8', 'Log9',
+           'Log10', 'Log11', 'Log12', 'Log13', 'Log14', 'Log15', 'Log16', 'Log17',
+           'Log18', 'Log19', 'Log20', 'Log21', 'Log22', 'Log23', 'Log24', '?zefix?',
+           '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?']
     # seventh position, values from  32 to 47, voice commands
-    voi = [
-        'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10',
-        'V11', 'V12', 'V13', 'V14', 'V15', '?zefix?'
-    ]
+    voi = ['V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10',
+           'V11', 'V12', 'V13', 'V14', 'V15', '?zefix?']
     # seventh position, values from 48 to 63, telemetry controls
-    mx = [
-        'MX1', 'MX2', 'MX3', 'MX4', 'MX5', 'MX6', 'MX7', 'MX8', 'MX9', 'MX10',
-        'MX11', 'MX12', 'MX13', 'MX14', 'MX15', 'MX16'
-    ]
+    mx = ['MX1', 'MX2', 'MX3', 'MX4', 'MX5', 'MX6', 'MX7', 'MX8', 'MX9', 'MX10',
+          'MX11', 'MX12', 'MX13', 'MX14', 'MX15', 'MX16']
     # seventh position, values from 64 to 79, accelerometers, special treatment in getSwitch for 76 -79
-    gx = [
-        'GX', 'GY', 'GZ', 'G/L', 'G/R', 'GXL', 'GXR', 'GHi', '?zefix?', '?zefix?',
-        '?zefix?', '?zefix?', 'timer', 'function', 'servo', 'flight mode'
-    ]
+    gx = ['GX', 'GY', 'GZ', 'G/L', 'G/R', 'GXL', 'GXR', 'GHi', '?zefix?', '?zefix?',
+          '?zefix?', '?zefix?', 'timer', 'function', 'servo', 'flight mode']
     # seventh position, values from 80 to 89, sequencers
     seq = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8', 'Q9', 'Q10']
     # seventh position, values from 90 to 129, CH = channels of ppm inputs, Tr = digital trims, C0 = user apps
-    sonst = [
-        'CH1', 'CH2', 'CH3', 'CH4', 'CH5', 'CH6', 'CH7', 'CH8', '?zefix?', '?zefix?',
-        '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', 'Tr1', 'Tr2', 'Tr3',
-        'Tr4', 'Tr5', 'Tr6', '?zefix?', '?zefix?', '?zefix?', '?zefix?', 'C01', 'C02',
-        'C03', 'C04', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
-        'Log.MAX', '?zefix?', '?zefix?'
-    ]
+    sonst = ['CH1', 'CH2', 'CH3', 'CH4', 'CH5', 'CH6', 'CH7', 'CH8', '?zefix?', '?zefix?',
+             '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', 'Tr1', 'Tr2', 'Tr3',
+             'Tr4', 'Tr5', 'Tr6', '?zefix?', '?zefix?', '?zefix?', '?zefix?', 'C01', 'C02',
+             'C03', 'C04', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+             'Log.MAX', '?zefix?', '?zefix?']
     switches7 = log + voi + mx + gx + seq + sonst
 
     # check if aString has exactly 7 commas und 8 integers
@@ -126,6 +112,7 @@ def getSwitch(aString):
     switchNo1 = int(xx)
     yy = aString.split(',')[6]
     switchNo7 = int(yy)
+
     # if seventh position is between 76 and 79 then it takes precedence over first position
     if switchNo7 == 76:  # is a timer, transmitter displays T + number
         if stopwatch[switchNo1] == 'nix':
@@ -143,7 +130,7 @@ def getSwitch(aString):
         else:
             return 'U' + str(switchNo1 - 13) + '  (' + funktionen[switchNo1]  + ')'
     if switchNo7 == 78:  # is a servo, transmitter displays O + number
-        if servolist[switchNo1 +1] == 'nix':
+        if servolist[switchNo1 + 1] == 'nix':
             return '??'
         return 'O' + str(switchNo1 + 1) + '  (' + servolist[switchNo1 + 1]  + ')'
     if switchNo7 == 79:  # is a flight mode, transmitter displays FM + number
@@ -153,7 +140,7 @@ def getSwitch(aString):
         kk = flightmoseq.index(switchNo1) + 1
         return 'FM' + str(kk) + '  (' + flightmolist[jj]  + ')'
     # if first position empty, take seventh position
-    if switchNo1 == 0:  
+    if switchNo1 == 0:
         if switchNo7 >= 0:
             if switches7[switchNo7] == '?zefix?':
                 return zefix(1)
@@ -162,7 +149,7 @@ def getSwitch(aString):
             return '-'
     else:  # otherwise return first position 'nix'
         return switches1[switchNo1]
-    
+
 
 # format integer als time string h:mm:ss
 def getTime(aInt):
@@ -205,15 +192,15 @@ def getYesNo(aInt):
     else:
         return zefix(1)
 
-    
+
 # print a dictionary, fileout is current output file as set in selectInput
 def printDict(aDict):
     for key in aDict:
         value = aDict[key]
         out = '\n' + str(key) + ';' + str(value) + ';'
         fileout.write(out)
-        
-        
+
+
 # set decimal point, divide aValue by 10 for aInt times to get intended float value (internal values are int only)
 def setDecPoint(aInt, aValue):
     while aInt > 0:
@@ -221,15 +208,15 @@ def setDecPoint(aInt, aValue):
         aInt -= 1
     return aValue
 
-    
-# write one of two strings using appropriate language, fileout is current output file as set in selectInput 
+
+# write one of two strings using appropriate language, fileout is current output file as set in selectInput
 def writeLine(deStr, enStr):
     if options['language'] == 'de':
         fileout.write(deStr)
     else:
         fileout.write(enStr)
-        
-        
+
+
 # write the essence of values (global or specific)
 def writeEssence(labels, values):
     # check if all values are identical then print first line one as global, otherwise print all lines
@@ -248,7 +235,7 @@ def writeEssence(labels, values):
 
 # handle zefix marker
 def zefix(aInt):
-    global zefixmark  # needed to preserve value between calls
+    global zefixmark  # global statement just needed to make it static
     if aInt == 0:
         zefixmark = 0
     if aInt == 1:
@@ -258,12 +245,26 @@ def zefix(aInt):
         return zefixmark
 
 
-# following functions are called by extract()
+# following functions are called by extractDict()
 # ----------------------------------  one function per dictionary at top level, sorted alphabetically     -----------------
 
 def accel(modelData):
+    if not hasAccel:
+        return
+    if not modelData['Accel']:
+        return
     writeLine('\n\nBewegunssensor', '\n\nAccelerometer')
-    printDict(modelData['Accel'])
+    writeLine('\nAchse;Glättung;Empfindlich.;Totzone;Pitch Offset', '\nAxis;Filtering;Sensitivity;Dead Zone;Pitch Offset')
+    pitchoff = str(modelData['Accel']['NeutrZ'][0])
+    ii = -1
+    for key in ['X', 'Y', 'Z']:
+        ii += 1
+        out = '\n' + key + ';' + str(modelData['Accel']['Filter'][ii]) + ';' + str(modelData['Accel']['Rate'][ii]) + ';' + str(modelData['Accel']['DeadZ'][ii])
+        if key == 'Y':
+            out = out + ';' + pitchoff
+        else:
+            out = out + ';-'
+        writeLine(out, out)
 
 
 def alarms(modelData):
@@ -283,8 +284,8 @@ def alarms(modelData):
         gt = '<='
         if item['Var-Greater'] == 1:
             gt = '>'
-        audio = item['File']
-        id = item['Sensor-ID']
+        audiof = item['File']
+        key = item['Sensor-ID']
         param = item['Sensor-Param']
         dec = item['Decimals']
         value = setDecPoint(dec, item['Value'])
@@ -295,9 +296,9 @@ def alarms(modelData):
         voi = getYesNo(item['Voice'])
         sensor = ''
         parm = ''
-        if id in sensorlist:
-            sensor = sensorlist[id][0]
-            parm = sensorlist[id][param]
+        if key in sensordict:
+            sensor = sensordict[key][0]
+            parm = sensordict[key][param]
         if ind == 1:
             if options['language'] == 'de':
                 sensor = 'Empfänger'
@@ -305,7 +306,7 @@ def alarms(modelData):
             else:
                 sensor = 'Receiver'
                 parm = 'Voltage Rx'
-        out = '\n' + str(ind) + ';' + sensor + ';' + parm + ';' + gt + ';' + str(value) + ';' + audio + ';' + sw + ';' + rep + ';' + voi + ';' + activt
+        out = '\n' + str(ind) + ';' + sensor + ';' + parm + ';' + gt + ';' + str(value) + ';' + audiof + ';' + sw + ';' + rep + ';' + voi + ';' + activt
         writeLine(out, out)
 
 
@@ -321,7 +322,7 @@ def commands(modelData):
 
 def common(modelData):
     # model time and its reset mode will be evaluated by timers()
-    
+
     # image and colors
     empty = True
     if 'Img' in modelData['Common']:
@@ -342,7 +343,7 @@ def common(modelData):
             outDe = '\n' + 'Hintergrundbild' + ';' + txt
             outEn = '\n' + 'Background image' + ';' + txt
             writeLine(outDe, outEn)
-    
+
     writeLine('\n\nSpezielle Modelloptionen:', '\n\nOther Model Options:')
     switch = getSwitch(modelData['Common']['Autotrim-Switch'])
     if switch != '-':
@@ -354,25 +355,25 @@ def common(modelData):
     if switch != '-':
         writeLine('\nStart-Logging Schalter;' + switch, '\nStart-Logging switch;' + switch)
     else:
-        writeLine('\nStart-Logging Schalter;Auto', '\nStart-Logging switch;Auto')    
+        writeLine('\nStart-Logging Schalter;Auto', '\nStart-Logging switch;Auto')
     switch = getSwitch(modelData['Common']['Throtle-Cut-Switch'])
     if switch != '-':
         writeLine('\nMotor-AUS Schalter;' + switch, '\nThrottle-Cut switch;' + switch)
     switch = getSwitch(modelData['Common']['Throtle-Idle-Switch'])
     if switch != '-':
         writeLine('\nLeerlaufschalter;' + switch, '\nThrottle-Idle switch;' + switch)
-    
+
     # check if 24 channels used
-    if '24ch' in modelData['Common']: 
+    if '24ch' in modelData['Common']:
         switch = getYesNo(modelData['Common']['24ch'])
         writeLine('\n\nDrahtlosmodus/Trainer:', '\n\nWireless Modes/Trainer:')
         writeLine('\n24-Kanal Multimode aktiv;' + switch, '\n24-Channels Multimode active;' + switch)
-    
+
     switch = getSwitch(modelData['Common']['RC-Switch'][0])
     if switch != '-':
         writeLine('\n\nRC Schalter;' + switch, '\n\nRC-Switch;' + switch)
-    
-    writeLine('\n\nAufzeichnung Senderstatus:',  '\n\nLogging transmitter status info:')
+
+    writeLine('\n\nAufzeichnung Senderstatus:', '\n\nLogging transmitter status info:')
     switch = getYesNo(modelData['Common']['Log-Alms'])
     writeLine('\nAufzeichnung Alarme;' + switch, '\nLog alarms;' + switch)
     outDe = '\nAufzeichnung Geber'
@@ -388,7 +389,7 @@ def common(modelData):
         outDe = outDe + ';keine'
         outEn = outEn + ';none'
     writeLine(outDe, outEn)
-    
+
     empty = True
     switch = getSwitch(modelData['Common']['Mnu-lft'])
     if switch != '-':
@@ -402,7 +403,7 @@ def common(modelData):
             empty = False
             writeLine('\n\nHauptseite:', '\n\nMain Screen:')
         writeLine('\nWähle folgende Seite;' + switch, '\nSwitch to following page;' + switch)
-        
+
     # FM-Annonc: Announce current flight mode, will be evaluated by flightmodes()
     # Marker-Switch and Telemetry-Voice-Switch probably old relics and never used
 
@@ -410,11 +411,9 @@ def common(modelData):
 def controls(modelData):  # Sticks/Switches setup (Voreinstellungen)
     writeLine('\n\nSticks/Schalter Setup:', '\n\nSticks/Switches Setup:')
     # controls, P3 and P4 are swapped due to a probable bug in transmitter
-    switches1 = [
-        'nix', 'P1', 'P2', 'P4', 'P3', 'P5', 'P6', 'P7', 'P8', 'SA', 'SB',
-        'SC', 'SD', 'SE', 'SF', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'P9',
-        'P10', 'SM', 'SN', 'SO', 'SP'
-    ]  
+    switches1 = ['nix', 'P1', 'P2', 'P4', 'P3', 'P5', 'P6', 'P7', 'P8', 'SA', 'SB',
+                 'SC', 'SD', 'SE', 'SF', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'P9',
+                 'P10', 'SM', 'SN', 'SO', 'SP']
     empty = True
     for item in modelData['Controls']['Data']:  # is liste of dicts
         ind = int(item['ID'])
@@ -457,16 +456,12 @@ def displayedtelemetry(modelData):
         writeLine('\nkeine Anzeige', '\nno display')
         return
     writeLine('\nNummer;Inhalt;Zoom', '\nNumber;Content;Double')
-    systemDe = [
-        '?zefix?', 'Flugphasen', 'Antenne', '?zefix?', 'RX-Spannung', 'Besitzer',
-        '?zefix?', 'Jetibox', 'Trim', 'Tx Akku', 'Flugzeit', 'Antenne 900MHz', '?zefix?',
-        'Modellbild', '?zefix?'
-    ]
-    systemEn = [
-        '?zefix?', 'Flight Modes', 'Antenna', '?zefix?', 'Voltage RX', 'User Name',
-        '?zefix?', 'Jetibox', 'Trim', 'Tx Battery', 'Model Time', 'Antenna 900MHz', '?zefix?',
-        'Model Image', '?zefix?'
-    ]
+    systemDe = ['?zefix?', 'Flugphasen', 'Antenne', '?zefix?', 'RX-Spannung', 'Besitzer',
+                '?zefix?', 'Jetibox', 'Trim', 'Tx Akku', 'Flugzeit', 'Antenne 900MHz', '?zefix?',
+                'Modellbild', '?zefix?']
+    systemEn = ['?zefix?', 'Flight Modes', 'Antenna', '?zefix?', 'Voltage RX', 'User Name',
+                '?zefix?', 'Jetibox', 'Trim', 'Tx Battery', 'Model Time', 'Antenna 900MHz', '?zefix?',
+                'Model Image', '?zefix?']
     ind = 0
     for item in modelData['Displayed-Telemetry']:  # ist liste von dicts
         if int(item['Flight-Mode']) > 0:
@@ -478,16 +473,16 @@ def displayedtelemetry(modelData):
             outDe = str(ind) + ';' + 'leer' + ';' + zoom
             outEn = str(ind) + ';' + 'empty' + ';' + zoom
         elif typ == 1:  # timers
-            id = int(item['ID'])
+            key = int(item['ID'])
             zoom = getYesNo(item['DblSize'])
-            outDe = str(ind) + ';' + stopwatch[id] + ';' + zoom
+            outDe = str(ind) + ';' + stopwatch[key] + ';' + zoom
             outEn = outDe
         elif typ == 2:  # sensors
-            id = int(item['ID'])
-            if id in sensorlist:
-                sensor = sensorlist[id][0]
+            key = int(item['ID'])
+            if key in sensordict:
+                sensor = sensordict[key][0]
                 parm = int(item['Param'])
-                wertDe = sensorlist[id][parm]
+                wertDe = sensordict[key][parm]
                 wertEn = wertDe
             else:
                 sensor = 'Sensor'
@@ -497,23 +492,24 @@ def displayedtelemetry(modelData):
             outDe = str(ind) + ';' + sensor + ' / ' + wertDe + ';' + zoom
             outEn = str(ind) + ';' + sensor + ' / ' + wertEn + ';' + zoom
         elif typ == 3:  # system
-            id = int(item['ID'])
+            key = int(item['ID'])
             zoom = getYesNo(item['DblSize'])
-            if id < len(systemDe):
-                txtDe = systemDe[id]
-                txtEn = systemEn[id]
+            if key < len(systemDe):
+                txtDe = systemDe[key]
+                txtEn = systemEn[key]
                 if txtDe == '?zefix?' or txtEn == '?zefix?':
                     zefix(1)
             else:
-                txt = zefix(1)
-            if id == 7:
+                txtDe = zefix(1)
+                txtEn = zefix(1)
+            if key == 7:
                 zoom = '-'
             outDe = str(ind) + ';' + txtDe + ';' + zoom
             outEn = str(ind) + ';' + txtEn + ';' + zoom
         elif typ == 4:  # Lua App
-            id = int(item['ID'])
-            if id in luaid:
-                sensor = 'Lua App  ' + str(id)
+            key = int(item['ID'])
+            if key in luaid:
+                sensor = 'Lua App  ' + str(key)
             zoom = '-'
             outDe = str(ind) + ';' + sensor + ';' + zoom
             outEn = outDe
@@ -528,9 +524,9 @@ def eventsounds(modelData):
     writeLine('\nSchalter;Datei;Wiederholen', '\nSwitch;File;Repeat')
     for item in modelData['Event-Sounds']['Data']:  # is list of dicts
         sw = getSwitch(item['Switch'])
-        audio = item['File']
+        audiof = item['File']
         rep = getYesNo(item['Repeat'])
-        out = '\n' + sw + ';' + audio + ';' + rep
+        out = '\n' + sw + ';' + audiof + ';' + rep
         writeLine(out, out)
 
 
@@ -545,14 +541,14 @@ def flightmodes1(modelData):  # sets flightmolist[] flightmoid[] flightmoseq[]
         for jj in range(1, ind + 1):
             flightmoseq[jj - 1] = flightmoid[jj]
     flightmoseq[ind] = flightmoid[0]
-    
+
 
 def flightmodes2(modelData):
-    writeLine('\n\nFlugphasen: allgemeine Daten  ', '\n\nFlight Modes: general data  ' )
+    writeLine('\n\nFlugphasen: allgemeine Daten  ', '\n\nFlight Modes: general data  ')
     switch = getSwitch(modelData['Common']['FM-Annonc'])
     if switch != '-':
         writeLine('\nAnsage der gewählten Flugphase;' + switch, '\nAnnounce current flight mode;' + switch)
-    
+
     outDe = '\nNummer;Titel;Verzögerung;Schalter;Audio'
     outEn = '\nNumber;Label;Delay;Switch;Audio'
     trimseq = 4 * [0]
@@ -568,14 +564,14 @@ def flightmodes2(modelData):
     writeLine(outDe, outEn)
     for item in modelData['Flight-Modes']['Data']:  # is list of dicts
         trim = 4 * ['nix']
-        id = int(item['ID'])
-        seq = flightmoseq.index(id) + 1
+        key = int(item['ID'])
+        seq = flightmoseq.index(key) + 1
         label = item['Label']
         aud = item['Audio']
         delay = setDecPoint(1, item['Delay'])
         delayout = str(delay) + 's'
         sw = getSwitch(item['Switch'])
-        if sw == '-' and id == flightmoid[0]:
+        if sw == '-' and key == flightmoid[0]:
             swDe = 'ist Standard'
             swEn = 'is default'
         else:
@@ -625,8 +621,8 @@ def flightmodes2(modelData):
     if aferatgt[0] == 2:
         writeLine('\nFlugphase;Geber;Wirkung;Pos S1 / S2;Neg S1 / S2', '\nFlight Mode;Control;Adjust;Up S1 / S2;Down S1 / S2')
     if aferatgt[0] == 4:
-        writeLine('\nFlugphase;Geber;Wirkung;Pos S1 / S2 / S3 / S4;Neg S1 / S2 / S3 / S4', 
-            '\nFlight Mode;Control;Adjust;Up S1 / S2 / S3 / S4;Down S1 / S2 / S3 / S4')
+        writeLine('\nFlugphase;Geber;Wirkung;Pos S1 / S2 / S3 / S4;Neg S1 / S2 / S3 / S4',
+                  '\nFlight Mode;Control;Adjust;Up S1 / S2 / S3 / S4;Down S1 / S2 / S3 / S4')
     out_buf_l = []
     out_buf_w = []
     for item in modelData['Flight-Modes']['Data']:  # ist liste von dicts
@@ -722,7 +718,7 @@ def flightmodes2(modelData):
         if aferatgt[2] == 1:
             outw = outw + ';' + but_hr_s1
         if aferatgt[2] == 2:
-            outw = outw + ';' + but_hr_s1 + ' / ' + but_hr_s1
+            outw = outw + ';' + but_hr_s1 + ' / ' + but_hr_s2
         outw = outw + ';' + curve + ';' + but_tun_sw + ';' + but_tun_dif + ';' + but_tun_qr + ';' + but_tun_wk + ';' + but_tun_hr
         out_buf_l.append(outl)
         out_buf_w.append(outw)
@@ -731,20 +727,20 @@ def flightmodes2(modelData):
 
 def functions1(modelData): # set funktionen[]
     for item in modelData['Functions']['Data']:  # is list of dicts
-        id = item['ID']
-        funktionen[id] = item['Label']
+        key = item['ID']
+        funktionen[key] = item['Label']
 
 
 def functions2(modelData):
     writeLine('\n\nFunktions+Geberzuordnung:', '\n\nFunctions Assignment:')
     writeLine('\nNummer;Funktion;Geber;Trim;Trim max', '\nNumber;Function;Control;Trim;Trim max')
     for item in modelData['Functions']['Data']:  # is list of dicts
-        id = item['ID']
+        key = item['ID']
         label = item['Label']
         control = getSwitch(item['Control'])
         trimcontrol = getSwitch(item['Trim-Control'])
         trimmax = item['Trim-Max']
-        out = str(id) + ';' + label + ';' + control
+        out = str(key) + ';' + label + ';' + control
         if trimcontrol != '-':
             out = out + ';' + trimcontrol + ';' + str(trimmax)
         writeLine('\n' + out, '\n' + out)
@@ -790,7 +786,7 @@ def functionspecs(modelData):
                 out_title_curve = out_title_curve + ';' + funt + ' Curve'
             else:
                 break
-            
+
     # collect data
     out_buf_l = []
     out_trim_w = []
@@ -823,6 +819,12 @@ def functionspecs(modelData):
         exneg = item['Expo-Neg'][0]
         expos = item['Expo-Pos'][0]
         curve = getCurve(item['Curve-Type'])
+        curvedat = ''
+        if curve == 'konstant' or curve == 'Constant':
+            curvedat = curvedat + '=' + str(item['Points-Out'][0])
+        delaya = setDecPoint(1, item['Delay-Neg'])
+        delayb = setDecPoint(1, item['Delay-Pos'])
+        curvedat = curvedat + '  -' + str(delaya) + ' +' + str(delayb) + '   ' + getYesNo(item['FM-Delay'])
         if flm == flmold:  # continue with same flight mode and append data
             hit = False
             for txt in aferatg_txt:
@@ -836,12 +838,12 @@ def functionspecs(modelData):
                         out_trim = out_trim + ' / ' + str(trim2) + ' / ' + str(trim3)
                     if aferatgt[ii] == 4:
                         out_trim = out_trim + ' / ' + str(trim2) + ' / ' + str(trim3) + ' / ' + str(trim4)
-            if hit == False:
+            if not hit:
                 out_trim = out_trim + ';' + str(trim1)
             out_dr = out_dr + ';' + str(drneg) + ' / ' + str(drpos)
             out_expo = out_expo + ';' + str(exneg) + ' / ' + str(expos)
             out_drsw = out_drsw + ';' + sw
-            out_curve = out_curve + ';' + curve
+            out_curve = out_curve + ';' + curve + curvedat
         else:  # next flight mode with first function
             if flmold != -1:
                 out_trim_w.append(out_trim)
@@ -863,12 +865,12 @@ def functionspecs(modelData):
                         out_trim = out_trim + ' / ' + str(trim2) + ' / ' + str(trim3)
                     if aferatgt[ii] == 4:
                         out_trim = out_trim + ' / ' + str(trim2) + ' / ' + str(trim3) + ' / ' + str(trim4)
-            if hit == False:
+            if not hit:
                 out_trim = ';' + str(trim1)
             out_dr = ';' + str(drneg) + ' / ' + str(drpos)
             out_expo = ';' + str(exneg) + ' / ' + str(expos)
             out_drsw = ';' + sw
-            out_curve = ';' + curve
+            out_curve = ';' + curve + curvedat
     out_trim_w.append(out_trim)
     out_dr_w.append(out_dr)
     out_expo_w.append(out_expo)
@@ -880,7 +882,7 @@ def functionspecs(modelData):
     writeLine('\n' + out_title_trim, '\n' + out_title_trim)
     writeEssence(out_buf_l, out_trim_w)
     writeLine('\n\nDual Rate                   ;   Werte für;   Position 1',
-        '\n\nDual Rate                   ;   values of;   Position 1')
+              '\n\nDual Rate                   ;   values of;   Position 1')
     writeLine('\n' + out_title_dr, '\n' + out_title_dr)
     writeEssence(out_buf_l, out_dr_w)
     writeLine('\n\nDual Rate Schalter', '\n\nDual Rate switches')
@@ -892,23 +894,27 @@ def functionspecs(modelData):
     writeLine('\n\nExponential', '\n\nExponential')
     writeLine('\n' + out_title_expo, '\n' + out_title_expo)
     writeEssence(out_buf_l, out_expo_w)
-    writeLine('\n\nFunktionskurven', '\n\nFunction Curves')
+    writeLine('\n\nFunktionskurven;Kurventyp   -Verzög+   FPVerzög', '\n\nFunction Curves;Curve type   -Delay+   FM.Delay')
     writeLine('\n' + out_title_curve, '\n' + out_title_curve)
     writeEssence(out_buf_l, out_curve_w)
 
 
 def globalstr(modelData):
     writeLine('\n\nGlobale Einstellungen:', '\n\nGlobal Settings:')
+    global hasAccel
+    # id: [transmitter-name, hasAccel (as boolean) ]
     txTyp = {
-        652: 'DC-16V2',
-        653: 'DS-16V2',
-        674: 'DC-16',
-        675: 'DS-16',
-        676: 'DS-14',
-        677: 'DC-14',
-        678: 'DC-24',
-        679: 'DS-24',
-        680: 'DS-12'
+        652: ['DC-16V2', False],
+        653: ['DS-16V2', True],
+        674: ['DC-16', False],
+        675: ['DS-16', True],
+        676: ['DS-14', True],
+        677: ['DC-14', False],
+        678: ['DC-24', False],
+        679: ['DS-24', True],
+        680: ['DS-12', True],
+        3857: ['DC-14V2', False],
+        3858: ['DS-14V2', True],
     }
     TxVers = False
     for item in modelData['Global']:
@@ -917,10 +923,11 @@ def globalstr(modelData):
             if value == 1:  # transmitter version <5, no type
                 continue
             if value in txTyp:
-                outDe = '\nSender Typ' + ';' + txTyp[value]
-                outEn = '\nTransmitter type' + ';' + txTyp[value]
+                outDe = '\nSender Typ' + ';' + txTyp[value][0]
+                outEn = '\nTransmitter type' + ';' + txTyp[value][0]
+                hasAccel = txTyp[value][1]
             else:
-                outDe = '\nSender Typ' + ';' + '?zefix?'
+                outDe = '\nSender Typ' + ';' + '?zefix?' + str(value)
                 outEn = '\nTransmitter type' + ';' + '?zefix?'
                 zefix(1)
             writeLine(outDe, outEn)
@@ -955,7 +962,7 @@ def globalstr(modelData):
             if options['language'] == 'de':
                 itemt = item.replace('Receiver', 'Empfänger')
             else:
-                itemt = item 
+                itemt = item
             value = int(modelData['Global'][item])
             if value > 0:
                 z2 = int(value / 65536)
@@ -1025,8 +1032,8 @@ def logswitch(modelData):
     if empty:
         writeLine('\nkeine Schalter', '\nno switches')
         return
-    writeLine('\nNummer;Titel;Aktiv;Geber1;Spezifkation1;Geber2;Spezifkation2;Zustand;Verzögerung', 
-        '\nNumber;Label;Enabled;Control1;Specification1;Control2;Specification2;Condition;Delay')
+    writeLine('\nNummer;Titel;Aktiv;Geber1;Spezifkation1;Geber2;Spezifkation2;Zustand;Verzögerung',
+              '\nNumber;Label;Enabled;Control1;Specification1;Control2;Specification2;Condition;Delay')
     for item in modelData['LogSwitch']['Data']:  # ist liste von dicts
         ind = int(item['Index'])
         if ind > last:
@@ -1066,7 +1073,7 @@ def logswitch(modelData):
             delayd = setDecPoint(1, int(item['Dn-Time']))
             delayout = ';' + uptyp + '  ' + str(delaya) + 's   ' + dntyp + '  ' + str(delayd) + 's'
         else:
-            delayout = ';' + '/  0.0s   \  0.0s'
+            delayout = ';' + r'/  0.0s   \  0.0s'
         out = '\nLog' + str(ind + 1) + ';' + label + ';' + enabled + ';' + sw1 + ';' + cond1txt + ';' + sw2 + ';' + cond2txt + ';' + zutxt + delayout
         writeLine(out, out)
 
@@ -1088,6 +1095,7 @@ def lua(modelData):
         # we display only those groups which contain a switch or a sensor and ignore all others
         luadata = item['data']
         counter = 0
+        out2 = ''
         out3 = ''
         for dat in luadata:
             if len(out3) > 0:
@@ -1102,12 +1110,12 @@ def lua(modelData):
                         out3 = sw
                     else:
                         out3 = out3 + ';' + sw
-                if type(dat) == int:
-                    if dat in sensorlist:
+                if isinstance(dat, int):
+                    if dat in sensordict:
                         if len(out3) == 0:
-                            out3 = sensorlist[dat][0]
+                            out3 = sensordict[dat][0]
                         else:
-                            out3 = out3 + ';' + sensorlist[dat][0]
+                            out3 = out3 + ';' + sensordict[dat][0]
             counter += 1
         if len(out3) > 0:
             out = out + ';' + out2 + ';' + out3
@@ -1147,7 +1155,7 @@ def mixesmain(modelData):
 
     writeLine('\n\nFreie Mischer: Flugphasen;;;;;Verzögerung', '\n\nFree Mixes: Flight Modes;;;;;Delay')
     writeLine('\nMischer;Flugphase;Master-Wert;Schalter;Kurve;-Basis+       -Schalter+;Mix-Ausgabe +;Mix-Ausgabe -;nur vorwärts;Master Link;Slave Link;Trim;Slave Dual-Rate',
-        '\nMix;Flight Mode;Master Value;Switch;Curve;-Source+    -Switch+;Mix Output +;Mix Output -;Single direction;Master Link;Slave Link;Trim;Slave Dual-Rate')
+              '\nMix;Flight Mode;Master Value;Switch;Curve;-Source+    -Switch+;Mix Output +;Mix Output -;Single direction;Master Link;Slave Link;Trim;Slave Dual-Rate')
     if options['language'] == 'de':
         links = ['nein', '+  ja', '-  ja']
     else:
@@ -1234,7 +1242,7 @@ def sequence(modelData):
     done = False
     for item in modelData['Sequence']:  # is list of dicts
         leer = True
-        id = item['ID']
+        key = item['ID']
         sw = getSwitch(item['Switch'])
         label = item['Label']
         servo = item['Override']
@@ -1250,8 +1258,8 @@ def sequence(modelData):
             asymEn = 'asymmetrical'
         cyc = getYesNo(item['Cycle'])
         fin = getYesNo(item['Finish'])
-        outDe = '\nQ' + str(id) + ';' + label + ';' + sw + ';' + serout + ';' + asymDe + ';' + cyc + ';' + fin
-        outEn = '\nQ' + str(id) + ';' + label + ';' + sw + ';' + serout + ';' + asymEn + ';' + cyc + ';' + fin
+        outDe = '\nQ' + str(key) + ';' + label + ';' + sw + ';' + serout + ';' + asymDe + ';' + cyc + ';' + fin
+        outEn = '\nQ' + str(key) + ';' + label + ';' + sw + ';' + serout + ';' + asymEn + ';' + cyc + ';' + fin
         if not leer:
             if not done:
                 writeLine(out_titleDe, out_titleEn)
@@ -1265,25 +1273,25 @@ def sequence(modelData):
 def servos1(modelData): # set servolist[]
     # servo labels as defined by jeti, codes start at 257 (Querruder1/Aileron1)
     servoNamesDe = ['Querruder1', 'Querruder2', 'Querruder3', 'Querruder4', 'Klappe1',
-        'Klappe2', 'Klappe3', 'Klappe4', 'Seite1', 'Seite2', 'Höhe1', 'Höhe2',
-        '?zefix?', '?zefix?', 'Drossel1', 'Drossel2', 'Drossel3', 'Drossel4',
-        'Fahrwerk1', 'Fahrwerk2', 'Fahrwerk3', 'Fahrwerk4', 'Störkl.1',
-        'Störkl.2', 'Roll', 'Nick', 'Pitch', '?zefix?', 'Heck', '?zefix?',
-        'Gyroempf.', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
-        '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
-        '?zefix?', 'Gyroempf.2', 'Gyroempf.3', 'Gimbal R', 'Gimbal P', 'Gimbal Y',
-        'Mode', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
-        '?zefix?', '?zefix?']
+                    'Klappe2', 'Klappe3', 'Klappe4', 'Seite1', 'Seite2', 'Höhe1', 'Höhe2',
+                    '?zefix?', '?zefix?', 'Drossel1', 'Drossel2', 'Drossel3', 'Drossel4',
+                    'Fahrwerk1', 'Fahrwerk2', 'Fahrwerk3', 'Fahrwerk4', 'Störkl.1',
+                    'Störkl.2', 'Roll', 'Nick', 'Pitch', '?zefix?', 'Heck', '?zefix?',
+                    'Gyroempf.', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+                    '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+                    '?zefix?', 'Gyroempf.2', 'Gyroempf.3', 'Gimbal R', 'Gimbal P', 'Gimbal Y',
+                    'Mode', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+                    '?zefix?', '?zefix?']
     servoNamesEn = ['Aileron1', 'Aileron2', 'Aileron3', 'Aileron4', 'Flap1',
-        'Flap2', 'Flap3', 'Flap4', 'Rudder1', 'Rudder2', 'Elevator1', 'Elevator2',
-        '?zefix?', '?zefix?', 'Throttle1', 'Throttle2', 'Throttle3', 'Throttle4',
-        'Gear1', 'Gear2', 'Gear3', 'Gear4', 'Airbrake1',
-        'Airbrake2', 'Roll', 'Elevator', 'Pitch', '?zefix?', 'Yaw', '?zefix?',
-        'Gyro sens.', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
-        '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
-        '?zefix?', 'Gyro sens.2', 'Gyro sens.3', 'Gimbal R', 'Gimbal P', 'Gimbal Y',
-        'Mode', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
-        '?zefix?', '?zefix?']
+                    'Flap2', 'Flap3', 'Flap4', 'Rudder1', 'Rudder2', 'Elevator1', 'Elevator2',
+                    '?zefix?', '?zefix?', 'Throttle1', 'Throttle2', 'Throttle3', 'Throttle4',
+                    'Gear1', 'Gear2', 'Gear3', 'Gear4', 'Airbrake1',
+                    'Airbrake2', 'Roll', 'Elevator', 'Pitch', '?zefix?', 'Yaw', '?zefix?',
+                    'Gyro sens.', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+                    '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+                    '?zefix?', 'Gyro sens.2', 'Gyro sens.3', 'Gimbal R', 'Gimbal P', 'Gimbal Y',
+                    'Mode', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?', '?zefix?',
+                    '?zefix?', '?zefix?']
 
     if options['language'] == 'de':
         servoNames = servoNamesDe
@@ -1329,8 +1337,8 @@ def servos1(modelData): # set servolist[]
 
 def servos2(modelData):
     writeLine('\n\nServozuordnung:', '\n\nServo Assignment:')
-    writeLine('\nSteckplatz;Servo;Mittenverstellung;Max. positiv;Max. negativ;Limit positiv;Limit negativ;Wegumkehr;Verzögerung pos/neg;Servobalancer',
-        '\nSlot;Servo;Subtrim;Max positive;Max negative;Max positive limit;Max negative limit;Reverse;Delay positive/negative;Servo balancer')
+    writeLine('\nSteckplatz;Servo;Mittenverstellung;Max. positiv;Max. negativ;Limit positiv;Limit negativ;Wegumkehr;Verzög. pos/neg;Servobalancer',
+              '\nSlot;Servo;Subtrim;Max positive;Max negative;Max positive limit;Max negative limit;Reverse;Delay positive/negative;Servo balancer')
     # now detail all servos
     for item in modelData['Servos']['Data']:  # is list of dicts
         ind = int(item['Index']) + 1
@@ -1349,6 +1357,7 @@ def servos2(modelData):
         if name != 'nix':
             out = '\n' + str(ind) + ';' + name + ';' + str(middle) + ';' + str(maxp) + ';' + str(maxn) + ';' + str(maxpl) + ';' + str(maxnl) + reverse + delayout + ';' + balancer
             writeLine(out, out)
+
 
 def snaprolls(modelData):
     if aferatgt[8] == 'V-Leitwerksmischer' or aferatgt[8] == 'V-Tail Mix' or aferatgt[8] == 'Delta/Elevon Mischer' or aferatgt[8] == 'Delta/Elevon Mix':
@@ -1398,10 +1407,10 @@ def telctrl(modelData):
         item = modelData['Tel-Ctrl']['Data'][ii]
         enabled = item['Enabled']
         label = item['Label']
-        id = item['Sensor-ID']
+        key = item['Sensor-ID']
         sw = getSwitch(item['Switch'])
         prop = item['Prop']
-        if enabled != 0 or label != '' or id != 0 or sw != '-' or prop != 0:
+        if enabled != 0 or label != '' or key != 0 or sw != '-' or prop != 0:
             empty = False
             last = ii
             break
@@ -1409,7 +1418,7 @@ def telctrl(modelData):
         writeLine('\nkeine Telemetriegeber', '\nno telemetry controls')
         return
     writeLine('\nNummer;Titel;Sensor;Messwert;Gebertyp;X < = > / Min;Schwellwert / Mitte;Toleranz / Max;Dauer / Glättung;Standardw %;Switch;Aktiv',
-        '\nNumber;Label;Sensor;Measurement;Type of control;X < = > / Min;Decision level / Center;Hysteresis / Max;Duration / Filtering;Default %;Switch;Enabled')
+              '\nNumber;Label;Sensor;Measurement;Type of control;X < = > / Min;Decision level / Center;Hysteresis / Max;Duration / Filtering;Default %;Switch;Enabled')
     comp = ['<', '>', '=']
     for item in modelData['Tel-Ctrl']['Data']:  # is list of dicts
         ind = int(item['Index'])
@@ -1417,10 +1426,10 @@ def telctrl(modelData):
             return
         enabled = getYesNo(int(item['Enabled']))
         label = item['Label']
-        id = item['Sensor-ID']
-        if id in sensorlist:
-            sensor = sensorlist[id][0]
-            wert = sensorlist[id][item['Param']]
+        key = item['Sensor-ID']
+        if key in sensordict:
+            sensor = sensordict[key][0]
+            wert = sensordict[key][item['Param']]
             out = 'MX' + str(ind + 1) + ';' + label + ';' + sensor + ';' + wert
         else:
             out = 'MX' + str(ind + 1) + ';' + label + ';' + '-' + ';' + '-'
@@ -1471,14 +1480,14 @@ def telemdetect(modelData):
         writeLine(outDe, outEn)
     if len(modelData['Telem-Detect']['Data']) == 0:
         return
-    id = ''
+    key = ''
     device = 65 * ['nix']
     for item in modelData['Telem-Detect']['Data']:  # is list of dicts
         ind = int(item['Param'])
         if ind == 0:  # next device / sensor
-            if id != '':
-                sensorlist[id] = device  # store parameter of previous device
-            id = item['ID']
+            if key != '':
+                sensordict[key] = device  # store parameter of previous device
+            key = item['ID']
             device = 65 * ['nix']
         device[ind] = item['Label']
         rep = getYesNo(item['Rep'])
@@ -1488,7 +1497,7 @@ def telemdetect(modelData):
         outDe = '\n' + str(device[0]) + ';' + str(device[ind]) + ';' + rep + ';' + trig + ';' + priotDe
         outEn = '\n' + str(device[0]) + ';' + str(device[ind]) + ';' + rep + ';' + trig + ';' + priotEn
         writeLine(outDe, outEn)
-    sensorlist[id] = device  # store parameter of last device
+    sensordict[key] = device  # store parameter of last device
 
 
 def telemvoice(modelData):
@@ -1499,17 +1508,44 @@ def telemvoice(modelData):
     if len(modelData['Telem-Voice']['Data']) == 0:
         writeLine('\nkeine Sprachansagen', '\nno voice announcements')
         return
-    writeLine('\nSensor;Messwert;Schalter', '\nSensor;Measurement;Switch')
+    writeLine('\nSchalter;Sensor;Messwert', '\nSwitch;Sensor;Measurement')
+    systemDe = ['?zefix?', '?zefix?', 'Antenne 1', 'Antenne 2', 'RX-Spannung', '?zefix?', '?zefix?', '?zefix?',
+                '?zefix?', '?zefix?', '?zefix?', '?zefix?', 'Q (Rx1)']
+    systemEn = ['?zefix?', '?zefix?', 'Antenna 1', 'Antenna 2', 'Voltage RX', '?zefix?', '?zefix?', '?zefix?',
+                '?zefix?', '?zefix?', '?zefix?', '?zefix?', 'Q (Rx1)']
+
     for item in modelData['Telem-Voice']['Data']:  # is list of dicts
-        key = item['ID']
+        key = int(item['ID'])
         parm = int(item['Param'])
         sw = getSwitch(item['Sw'])
-        if key in sensorlist:
-            outDe = sensorlist[key][0] + ';' + sensorlist[key][parm] + ';' + sw
-            outEn = sensorlist[key][0] + ';' + sensorlist[key][parm] + ';' + sw
+        if abs(key) < 30: # chosen to cover all timers
+            if key == 0:    # system as sensor
+                if parm < len(systemDe):
+                    if parm == 0:
+                        outDe = sw + ';' + '-' + ';' + '-'
+                        outEn = sw + ';' + '-' + ';' + '-'
+                    else:
+                        outDe = sw + ';' + 'System' + ';' + systemDe[parm]
+                        outEn = sw + ';' + 'System' + ';' + systemEn[parm]
+                        if systemDe[parm] == '?zefix?':
+                            zefix(1)
+                else:
+                    outDe = sw + ';' + zefix(1)
+                    outEn = sw + ';' + zefix(1)
+            else:   # timer
+                if key < len(stopwatch):
+                    outDe = sw + ';' + 'Timer' + ';' + stopwatch[key]
+                    outEn = sw + ';' + 'Timer' + ';' + stopwatch[key]
+                else:
+                    outDe = sw + ';' + 'Timer' + ';' + 'existiert nicht'
+                    outDe = sw + ';' + 'Timer' + ';' + 'does not exist'
         else:
-            outDe = 'Sensor fehlt:;' + str(key) + ';' + sw
-            outEn = 'Sensor missing:;' + str(key) + ';' + sw
+            if key in sensordict:
+                outDe = sw + ';' + sensordict[key][0] + ';' + sensordict[key][parm]
+                outEn = sw + ';' + sensordict[key][0] + ';' + sensordict[key][parm]
+            else:
+                outDe = sw + ';' + 'Sensor fehlt:;' + str(key)
+                outEn = sw + ';' + 'Sensor missing:;' + str(key)
         writeLine('\n' + outDe, '\n' + outEn)
 
 
@@ -1518,11 +1554,11 @@ def timers1(modelData): # fill stopwatch[]
         return
     jj = 0
     for item in modelData['Timers']['Data']:  # is list of dicts
-        id = int(item['ID'])
-        stopwatch[id] = item['Label']
+        key = int(item['ID'])
+        stopwatch[key] = item['Label']
         jj += 1
-        stopwatchid[jj] = id
-    
+        stopwatchid[jj] = key
+
 
 def timers2(modelData):
     writeLine('\n\nStoppuhren:', '\n\nTimers:')
@@ -1531,16 +1567,16 @@ def timers2(modelData):
         modeltime = getTime(modelData['Common']['Model-Time2']).strip('+')
         writeLine('\nFlugzeit;' + modeltime, '\nModel Time;' + modeltime)
         if options['language'] == 'de':
-            reset = [ 'Kein', 'kurz', 'Alle']
+            reset = ['Kein', 'kurz', 'Alle']
         else:
-            reset = [ 'None', 'Short reset', 'All']
+            reset = ['None', 'Short reset', 'All']
         mode = modelData['Common']['Time-Reset']
         if mode < len(reset):
             resmod = reset[mode]
         else:
             resmod = zefix(1)
         writeLine('\nZurücksetzen-Timer; beim Start:;' + resmod, '\nTimers reset; at power up:;' + resmod)
-    
+
     if len(modelData['Timers']['Data']) == 0:
         writeLine('\nkeine Stoppuhren', '\nno timers')
         return
@@ -1550,8 +1586,8 @@ def timers2(modelData):
     else:
         timtyp = ['Standard', 'Free-Running', 'Laps']
         reptyp = ['None', 'Beep 1', 'Beep 2', 'Voice', 'Voice (Up)']
-    writeLine('\nStoppuhr Nummer;Name;Startwert;Zielwert;Timer-Typ;Signalisierung;Schalter;Resetschalter', 
-        '\nTimer Number;Label;Initial value;Target value;Timer type;Report type;Switch;Reset switch')
+    writeLine('\nStoppuhr Nummer;Name;Startwert;Zielwert;Timer-Typ;Signalisierung;Schalter;Resetschalter',
+              '\nTimer Number;Label;Initial value;Target value;Timer type;Report type;Switch;Reset switch')
     jj = 0
     for item in modelData['Timers']['Data']:  # is list of dicts
         jj += 1
@@ -1583,7 +1619,7 @@ def typespecific(modelData):
     if modelData['Type-Specific']['Model-Type'] != 'Aero':
         printDict(modelData['Type-Specific'])
         return
-    
+
     if options['language'] == 'de':
         wing = ['1 Querruder', '2 Querruder', '2 QR | 1 WK', '2 QR | 2 WK', '4 QR | 2 WK', '2 QR | 4 WK', '4 QR | 4 WK']
     else:
@@ -1697,9 +1733,8 @@ def vario(modelData):
     else:
         modet = zefix(1)
     sw = getSwitch(modelData['Vario']['Switch'])
-    setting = modelData['Vario']['Setting']  # is list of dicts
     for ii in range(len(modelData['Vario']['Setting'])):
-        id = modelData['Vario']['Setting'][ii]['Sensor-ID']
+        key = modelData['Vario']['Setting'][ii]['Sensor-ID']
         param = int(modelData['Vario']['Setting'][ii]['Sensor-Par'])
         dec = int(modelData['Vario']['Setting'][ii]['Decimals'])
         deadzpos = str(setDecPoint(dec, int(modelData['Vario']['Setting'][ii]['DeadZPos'])))
@@ -1708,14 +1743,14 @@ def vario(modelData):
         center = str(setDecPoint(dec, int(modelData['Vario']['Setting'][ii]['Center'])))
         maxw = str(setDecPoint(dec, int(modelData['Vario']['Setting'][ii]['Max'])))
         enabled = getYesNo(modelData['Vario']['Setting'][ii]['En'])
-        if id in sensorlist:
-            sensor = sensorlist[id][0]
-            parm = sensorlist[id][param]
+        if key in sensordict:
+            sensor = sensordict[key][0]
+            parm = sensordict[key][param]
             if empty:
                 writeLine('\nMode;' + modet, '\nMode;' + modet)
                 writeLine('\nSchalter;' + sw, '\nSwitch;' + sw)
                 writeLine('\nSensor;Messwert;Totzone -;Totzone +;Weite -;Center;Weite +;Aktiv',
-                    '\nSensor;Measurement;Dead Zone -;Dead Zone +;Range -;Center;Range +;Enabled')
+                          '\nSensor;Measurement;Dead Zone -;Dead Zone +;Range -;Center;Range +;Enabled')
                 empty = False
             out = '\n' + sensor + ';' + parm + ';' + deadzneg + ';' + deadzpos + ';' + minw + ';' + center + ';' + maxw + ';' + enabled
             writeLine(out, out)
@@ -1753,8 +1788,8 @@ def voicerec(modelData):
     printDict(modelData['VoiceRec'])
 
 
-#--------------------------------    function to extract all dicts from model file    --------------------------------------
-def extract(modelData):
+# --------------------------------    function to extract all dicts from model file    --------------------------------------
+def extractDict(modelData):
     # these globals must be declared here again to avoid variable shadowing
     global aferatgt  # number of servos: aileron flaps elevator ruder airbrake throttle gear butterfly(1=needs butterfly) delta/v-lw
     global aferatg_txt
@@ -1763,10 +1798,11 @@ def extract(modelData):
     global flightmoid
     global flightmoseq
     global luaid
-    global sensorlist
+    global sensordict
     global servolist
     global stopwatch
     global stopwatchid
+    global hasAccel
 
     # set initial values for all global arrays
     aferatgt = [0, 0, 0, 0, 0, 0, 0, 0, '']
@@ -1775,57 +1811,99 @@ def extract(modelData):
     flightmoid = 11 * ['nix']
     flightmoseq = 11 * ['nix']
     luaid = 31 * [0]
-    sensorlist = {}
+    sensordict = {}
     servolist = 25 * ['nix']
     stopwatch = 11 * ['nix']
     stopwatchid = 11 * ['nix']
-    zefix(0)
-        
+    hasAccel = False
+    zefix(0) # set zefix marker to 0
+
     # evaluate all dicts of top level
     globalstr(modelData)
     typespecific(modelData)         # sets aferatgt[]
-    functions1(modelData)           # sets funktionen[] 
+    functions1(modelData)           # sets funktionen[]
     servos1(modelData)              # sets servolist[]
     flightmodes1(modelData)         # sets flightmolist[] flightmoid[] flightmoseq[]  and reads aferatgt[]
-    timers1(modelData)              # sets stopwatch[] stopwatchid[] 
-    common(modelData)               
+    timers1(modelData)              # sets stopwatch[] stopwatchid[]
+    common(modelData)
     controls(modelData)
     ctrlsound(modelData)
-    functions2(modelData)           
+    functions2(modelData)
     servos2(modelData)              # reads funktionen[]
     flightmodes2(modelData)         # reads aferatgt[]
     functionspecs(modelData)        # reads funktionen[] flightmolist[] aferatgt[]
     mixesmain(modelData)            # reads funktionen[] flightmolist[] aferatgt[]
     snaprolls(modelData)            # reads flightmolist[] aferatgt[]
     sequence(modelData)             # reads servolist[]
-    timers2(modelData)              
+    timers2(modelData)
     logswitch(modelData)
     eventsounds(modelData)
     voice(modelData)                # reads stopwatch[]
-    telemdetect(modelData)          # sets sensorlist[]
-    telemvoice(modelData)           # sets sensorlist[]
-    telctrl(modelData)              # sets sensorlist[]
-    lua(modelData)                  # sets luaid[] and reads sensorlist[]
-    displayedtelemetry(modelData)   # reads luaid[] sensorlist[] stopwatch[]
-    vario(modelData)                # reads sensorlist[]
-    alarms(modelData)               # reads sensorlist[]
-    
+    telemdetect(modelData)          # sets sensordict
+    telemvoice(modelData)           # sets sensordict
+    telctrl(modelData)              # sets sensordict
+    lua(modelData)                  # sets luaid[] and reads sensordict
+    displayedtelemetry(modelData)   # reads luaid[] sensordict stopwatch[]
+    vario(modelData)                # reads sensordict
+    alarms(modelData)               # reads sensordict
+    accel(modelData)                # reads hasAccel
+
     # currently not evaluated
     #mixesvalues(modelData)        # data processed by mixesmain()
     #luactrl(modelData)            # purpose unknown
     #iqsdata(modelData)            # purpose unknown
     #commands(modelData)           # purpose unknown
-    #accel(modelData)              # accelerometer, unknown which values are default or modified
     #audio(modelData)              # dx-24 needed for testing
     #voicerec(modelData)           # dx-24 needed for testing
     #usermenu(modelData)           # low priority
 
 
-#------------------------   function to select model files and then call extract function for each selected model  ----
+# ---------------------------    function to extract patterns of hardware switches and controls from model file  -----------------------------
+# extracts text patterns, so all controls and switches will be found if used or just referenced in logical switch
+# exceptions: switches at start-up position are defined by index
+def extractPat(modelTxt):
+    writeLine('\n\n\nGeber und Schalter', '\n\n\nControls and switches')
+
+    # pattern of switches and controls
+    swpat = re.compile("\"-?[0-9]+,-?[0-9]+,-?[0-9]+,-?[0-9]+,-?[0-9]+,-?[0-9]+,-?[0-9]+,-?[0-9]+\"")
+    # hardware and software controls and switches to be listed
+    hw = ['P1', 'P2', 'P4', 'P3', 'P5', 'P6', 'P7', 'P8', 'SA', 'SB',
+          'SC', 'SD', 'SE', 'SF', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'P9',
+          'P10', 'SM', 'SN', 'SO', 'SP']
+    accels = ['GX', 'GY', 'GZ', 'G/L', 'G/R', 'GXL', 'GXR', 'GHi']
+    trim = ['Tr1', 'Tr2', 'Tr3', 'Tr4', 'Tr5', 'Tr6']
+    tobelisted = hw + accels + trim
+
+    swlist = []
+    swlist2 = []
+    allsw = re.findall(swpat, modelTxt)
+    for xx in allsw:
+        # remove leading and trailing "
+        yy = xx[1:len(xx)-1]
+        sw = getSwitch(yy)
+        if sw != 'P10':
+            sw2 = sw
+        else:
+            sw2 = 'Q10' # to sort P10 at end of P's
+        if sw in tobelisted:
+            swlist.append(sw2)
+        # debugging
+        #writeLine('\n'+yy+';'+sw, '\n'+yy+';'+sw)
+
+    # sort it unique
+    swlist2 = sorted(set(swlist))
+    for sw in swlist2:
+        if sw != 'Q10':
+            out = '\n' + sw
+        else:
+            out = '\n' + 'P10'
+        writeLine(out, out)
+
+# ------------------------   function to select model files and then call extract... functions for each selected model  ----
 def selectInput():
-    # this global must be declared here again to avoid variable shadowing (because it is set)
+    # this global must be declared here again to avoid variable shadowing (is set here)
     global fileout
-    
+
     initdir = os.getcwd()
     if options['language'] == 'de':
         txt1 = 'eine oder mehrere jsn Modell Dateien auswählen'
@@ -1841,7 +1919,7 @@ def selectInput():
         multiple=True)
     if not filelist:
         return None
-    
+
     for item in filelist:
         fileName = item.name  # is a fully qualified name
         print('\ninput', fileName)
@@ -1877,6 +1955,10 @@ def selectInput():
             print(out)
             tk.messagebox.showinfo(title='jemoview', message=out)
             continue
+        # open fileName again and read as one line text (previous open was successful so try not needed)
+        with open(fileName, 'r', encoding='utf-8', errors='replace') as filein2:
+            modelTxt = filein2.readline()
+            filein2.close()
 
         # check where to store resulting csv files, default is same folder as model file
         filecsv = fileName.replace('.jsn', '.csv')
@@ -1896,13 +1978,14 @@ def selectInput():
                     print(out)
                     tk.messagebox.showinfo(title='jemoview', message=out)
                     continue
-                    
+
         # create output
         try:
             with open(filecsv, 'w', encoding='utf-8', errors='replace') as fileout:
                 fileout.write(version)
                 # extract content of model
-                extract(modelData)
+                extractDict(modelData)
+                extractPat(modelTxt)
                 fileout.write('\n') # last line
         except:
             if options['language'] == 'de':
@@ -1913,7 +1996,7 @@ def selectInput():
             print(out)
             tk.messagebox.showinfo(title='jemoview', message=out)
             continue
-        
+
         if zefix(2) > 0:
             if options['language'] == 'de':
                 out = 'Datenlücke bei Modell\n' + fileName + '\nbitte Modell im jetiforum.de einstellen'
@@ -1923,7 +2006,7 @@ def selectInput():
             tk.messagebox.showinfo(title='jemoview', message=out)
         print('output', filecsv)
         fileout.close()
-    
+
     if options['language'] == 'de':
         out = 'bereit für weitere Modelle'
     else:
@@ -1932,7 +2015,7 @@ def selectInput():
     return
 
 
-#------------------------------- set options, called from main loop -------------------
+# ------------------------------- set options, called from main loop -------------------
 
 
 def setLang(langOpt):
@@ -1964,7 +2047,7 @@ def setCsv(csvOpt):
     return
 
 
-#------------------------------------     main   loop -------------------
+# ------------------------------------     main   loop -------------------
 
 app = tk.Tk()
 app.title(version)
