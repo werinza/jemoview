@@ -17,7 +17,7 @@ import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-version = 'jemoview; version 2021-07-08'
+version = 'jemoview; version 2021-07-09'
 
 options = {'language': 'de',
            'csv': 'model-folder'}
@@ -1481,14 +1481,17 @@ def telemdetect(modelData):
     if len(modelData['Telem-Detect']['Data']) == 0:
         return
     key = ''
-    device = 65 * ['nix']
+    device = 256 * ['nix']
     for item in modelData['Telem-Detect']['Data']:  # is list of dicts
         ind = int(item['Param'])
         if ind == 0:  # next device / sensor
             if key != '':
                 sensordict[key] = device  # store parameter of previous device
             key = item['ID']
-            device = 65 * ['nix']
+            device = 256 * ['nix']
+        if ind > len(device):
+            zefix(1)
+            return
         device[ind] = item['Label']
         rep = getYesNo(item['Rep'])
         trig = getYesNo(item['Trig'])
