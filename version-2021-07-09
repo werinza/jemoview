@@ -6,4 +6,4 @@ jemoview; version 2021-07-09
 - Funktionskurven verbessert
 - Accelerometer ausgewertet
 - Schalter und Geber am Ende aufgelistet
-- Anzahl Messwerte (Parameter) von 65 auf 256 erhöht
+- Anzahl Messwerte (Parameter) bei Sensoren von 65 auf 256 erhöht
