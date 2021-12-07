@@ -1,9 +1,0 @@
- 
-jemoview; version 2021-07-09
-
-2021-07-09
-- Einzelsprachansagen erweitert auf System und Timer
-- Funktionskurven verbessert
-- Accelerometer ausgewertet
-- Schalter und Geber am Ende aufgelistet
-- Anzahl Messwerte (Parameter) bei Sensoren von 65 auf 256 erhöht
