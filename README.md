@@ -17,6 +17,21 @@ uses the semicolon ; as its standard separator. The advantage of the csv format 
 usual table programs such as _Excel_ (by MS) or _Calc_ (by Libre Office) will display the data as table
 and on the other hand its data can be processed as text with usual search or comparison programs.
 
+Before processing, the jemoview program checks whether a file named settings.txt exists. This file
+can contain options for controlling jemoview, such as the language (German or English), the
+destination folder of the csv files to be created, and above all the installation direction of the
+switches. Normally, the switches are installed correctly ex works, but it can happen that they are
+rotated by 180 degrees. E.g. option "SA": 0 would correct the wrong mounting direction of switch
+SA, while option "SB": 1 indicates that switch SB is mounted correctly. Such a switch correction
+only refers to the display in the evaluation of jemoview. In fact, jemoview shows the switch-on
+position for "Top" by means of an arrow ↑. However, if the switch is mounted in a rotated position,
+"Top" is in the lower position, so that in this case the switch-on position would be better displayed
+with arrow ↓. If no settings.txt file exists or its content is invalid, the standard options are used and a
+message "File settings.txt not found" appears in the terminal window. If a settings.txt file exists, its
+valid options are displayed in the terminal window. The settings file is in JSON format, so no
+special characters such as "{}:," should be deleted or changed. An example of settings can be found
+in the github folder.
+
 
 Version history:
 
