@@ -1,0 +1,11 @@
+ 
+jemoview; version 2021-12-07
+
+2021-12-07
+- bei Sensoren und Einstellungen die Sensor ID anzeigen
+- Sticks/Schalter Setup detaillierter anzeigen
+- Schalter mit Position anzeigen
+- Anzeige logische Schalter erweitert
+- Digitaltrimm detaillierter anzeigen
+- settings.txt eingeführt für Optionen
+
