@@ -41,5 +41,6 @@ crash barrier "zefix" introduced, bugfixes
 2021-07-08:  
 accelerometer evaluated, list of controls and switches added, bugfixes
 
-2021-12-07:__
-position of switches displayed, more details for digital trim, settings.txt introduced, bugfixes
+2021-12-07:  
+position of switches displayed, more details for digital trim, sensor ID displayed, 
+settings.txt introduced, bugfixes
