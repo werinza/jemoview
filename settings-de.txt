@@ -1,0 +1,25 @@
+{
+"_wichtig":"Dateiname muss settings.txt sein, andere Namen werden nicht erkannt",
+"_wichtig":"keines der folgenden Zeichen löschen oder ändern in dieser Datei ,:{}",
+"jemoview":{
+"language":"de","_comment":"de für Deutsch, or use en for English",
+"csvtarget":"samefolder","_comment":"option subfolder falls Ergebnis in Unterordner von Model Datei"
+},
+"switches":{"_comment":"Wert 1 falls Schalter mit richtiger Richtung montiert, Wert 0 falls Schalter umgedreht montiert",
+"SA":1,
+"SB":1,
+"SC":1,
+"SD":1,
+"SE":1,
+"SF":1,
+"SG":1,
+"SH":1,
+"SI":1,
+"SJ":1,
+"SK":1,
+"SL":1,
+"SM":1,
+"SN":1,
+"SO":1,
+"SP":1
+}}
