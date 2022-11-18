@@ -17,14 +17,14 @@ import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-version = 'jemoview;version 2022-01-05'
+version = 'jemoview;version 2022-11-18'
 
 aferatg_txt = ['Quer', 'Klappen', 'Höhe', 'Seite', 'Störkl.', 'Drossel', 'Fahrwerk',
                'Ailerons', 'Flaps', 'Elevator', 'Rudder', 'Airbrake.', 'Throttle', 'Gear']
 
 # following globals are reset in extractDict() for each call
 aferatgt = []       # list of servo count for main functions defined by aferatg_txt, plus tail features at end
-functionlist = []     # list of labels of used functions
+functionlist = []   # list of labels of used functions
 flightmolist = []   # list of labels of used flight modes
 flightmoid = []     # list of id of used flight modes
 flightmoseq = []    # list of flight modes as displayed by transmitter
@@ -42,6 +42,7 @@ hasAccel = False    # true if transmitter has accelerometer
 def checkBala(aList):
     # check all elements of alist if value == 0
     status = 0
+    # variable counter is needed here as placeholder
     for counter, value in enumerate(aList):
         if value != 0:
             status = 1
@@ -68,7 +69,7 @@ def getCurve(aInt):
 
 # evaluate device and return it as Jeti device id (as couple of 2 integers, "device type : kind of serial")
 # both are integers 16-bit if device id positive, negative means serial part >32767 had overflow
-# YGE uses one fixed data for all ESC devices (42044:64177) adding +1 if more than one ESC present, so others might follow suit
+# YGE uses one fixed data for all ESC devices (42044:64177), user must  add +1 if more than one ESC present
 def getDeviceID(aInt):
     if aInt == 0:
         return '-'
@@ -86,13 +87,13 @@ def getDeviceID(aInt):
 
 
 # getSwitch evaluates the internal switch representation which is a string made of 7 commas and 8 integers, example "12,0,0,1,1,-4000,-1,4"
-# pos 1 : genuine control or switch if >0
+# pos 1 : hardware control or hardware switch if >0 and < 27 (pos 7 is -1)
 # pos 2 : 0 normal, 1 inverted
 # pos 3 : 0 normal, 1 proportional
 # pos 4 : purpose unknown
 # pos 5 : 0 normal, 1 centered
-# pos 6 : its value (-4000 - +4000)
-# pos 7 : other switch (if pos 1 is 0)
+# pos 6 : value where active in range (-4000, +4000)
+# pos 7 : other switch
 # pos 8 : 0 normal, -1 interval
 # returns a list [the_switch, the_switch plus its value as string, the_switch plus its value as string if S switch otherwise the_switch, True if proportional
 def getSwitch(aString):
@@ -124,7 +125,7 @@ def getSwitch(aString):
               'Log.MAX', '?zefix?', '?zefix?']
     switches7 = log + voi + mx + gx + seq + others
 
-    # list of genuine switches, needed for compensation from settings
+    # list of hardware switches, needed for compensation read from settings
     swlist = ['SA', 'SB', 'SC', 'SD', 'SE', 'SF', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'SM', 'SN', 'SO', 'SP']
 
     # check if aString has exactly 7 commas und 8 integers
@@ -147,7 +148,7 @@ def getSwitch(aString):
     if int(aString.split(',')[2]) == 1:
         proport = True
 
-    # if seventh position is between 76 and 79 then it takes precedence over first position
+    # if seventh position is between 76 and 79 then it has priority over first position
     if switchNo7 == 76:  # is a timer, transmitter displays T + number
         if stopwatch[switchNo1] == 'nix':
             return ['??', '??', '??', False]
@@ -162,18 +163,23 @@ def getSwitch(aString):
         if switchNo1 >= len(functionlist):
             zefix(1)
             return ['?zefix?', '?zefix?', '?zefix?', False]
-        if functionlist[switchNo1] == 'nix':
-            return ['??', '??', '??', False]
         if switchNo1 <= 13: # standard function
-            out = functionlist[switchNo1]
-            return [out, out, out, proport]
+            if functionlist[switchNo1] != 'nix':
+                out = functionlist[switchNo1]
+            else:
+                out = '??'
         else:
-            out = 'U' + str(switchNo1 - 13) + '  (' + functionlist[switchNo1]  + ')'
-            return [out, out, out, proport]
+            out = 'U' + str(switchNo1 - 13)
+            if functionlist[switchNo1] != 'nix':
+                if functionlist[switchNo1] == 'Butterfly':
+                    out = 'Butterfly'
+                else:
+                    out = out + '  (' + functionlist[switchNo1]  + ')'
+        return [out, out, out, proport]
     if switchNo7 == 78:  # is a servo, transmitter displays O + number
-        if servolist[switchNo1 + 1] == 'nix':
-            return ['??', '??', '??', False]
-        out = 'O' + str(switchNo1 + 1) + '  (' + servolist[switchNo1 + 1]  + ')'
+        out = 'O' + str(switchNo1 + 1)
+        if servolist[switchNo1 + 1] != 'nix':
+            out = out + '  (' + servolist[switchNo1 + 1]  + ')'
         return [out, out, out, proport]
     if switchNo7 == 79:  # is a flight mode, transmitter displays FM + number
         if switchNo1 not in flightmoid:
@@ -410,7 +416,6 @@ def common(modelData):
     # Marker-Switch and Telemetry-Voice-Switch probably old relics and never used
     
     # check image and colors
-    
     empty = True
     colors = ['Black&White', 'Light Red', 'Light Green', 'Light Blue', 'Light Yellow', 'Light Violet', 'Light Pink',
               'Blue&Orange', 'Warm Red', 'Dark Red', 'Dark Indigo', 'Dark Green', 'Light Orange']
@@ -470,6 +475,11 @@ def common(modelData):
         switch = getYesNo(modelData['Common']['24ch'])
         writeLine('\n\nDrahtlosmodus/Trainer:', '\n\nWireless Modes/Trainer:')
         writeLine('\n24-Kanal Multimode aktiv;' + switch, '\n24-Channels Multimode active;' + switch)
+        
+    # check if Morse Code Alarms used
+    if 'Alrm-Enable-Morse' in modelData['Common']:
+        switch = getYesNo(modelData['Common']['Alrm-Enable-Morse'])
+        writeLine('\n\nMorsecode Alarme eingeschaltet;' + switch, '\n\nMorse Code Alarms enabled;' + switch)
 
     switch = getSwitch(modelData['Common']['RC-Switch'][0])[1]
     if switch != '-':
@@ -505,9 +515,9 @@ def common(modelData):
             empty = False
             writeLine('\n\nHauptseite:', '\n\nMain Screen:')
         writeLine('\nWähle folgende Seite;' + switch, '\nSwitch to following page;' + switch)
-   
 
-def controls(modelData):  # Sticks/Switches setup (Voreinstellungen)
+
+def controls(modelData):  # Sticks/Switches setup
     writeLine('\n\nSticks/Schalter Setup:', '\n\nSticks/Switches Setup:')
     writeLine('\nStick/Schalter;Vor-Flug Position;kompensiert mit settings;Schalter EIN;Schalter AUS', '\nStick/Switch;Required pre-fl. pos.;compensated with settings;Switch On;Switch Off')
     # controls, P3 and P4 are swapped due to a probable bug in transmitter
@@ -604,15 +614,15 @@ def displayedtelemetry(modelData):
             if key in sensordict:
                 sensor = sensordict[key][0]
                 parm = int(item['Param'])
-                wertDe = sensordict[key][parm]
+                wertDe = ': ' + sensordict[key][parm]
                 wertEn = wertDe
             else:
-                sensor = 'Sensor ' + str(key)
-                wertDe = 'fehlt'
-                wertEn = 'missing'
+                sensor = 'Sensor '
+                wertDe = getDeviceID(key) + ' fehlt'
+                wertEn = getDeviceID(key) + ' missing'
             zoom = getYesNo(item['DblSize'])
-            outDe = str(ind) + ';' + sensor + ': ' + wertDe + ';' + zoom
-            outEn = str(ind) + ';' + sensor + ': ' + wertEn + ';' + zoom
+            outDe = str(ind) + ';' + sensor + wertDe + ';' + zoom
+            outEn = str(ind) + ';' + sensor + wertEn + ';' + zoom
         elif typ == 3:  # system
             key = int(item['ID'])
             zoom = getYesNo(item['DblSize'])
@@ -927,9 +937,14 @@ def functions2(modelData):
         if trimcontrol != '-':
             out = out + ';' + trimcontrol + ';' + str(trimmax)
         writeLine('\n' + out, '\n' + out)
-    # add Butterfly to functionlist - is hidden (because automatically added sources of free mixers since V5.0 ?)
+    # butterfly automatically added as virtual function since Jeti V5.0
     if aferatgt[0] >= 2:
         functionlist[31] = 'Butterfly'
+        # add Brk and Flp if missing in standard functions (standard functions could be deleted before Jeti V5)
+        if functionlist[5] == 'nix':
+            functionlist[5] = 'Brk'
+        if functionlist[6] == 'nix':
+            functionlist[6] = 'Flp'
 
 
 def functionspecs(modelData):
@@ -1190,6 +1205,11 @@ def globalstr(modelData):
             continue
         if item == 'Type':
             continue
+        if item == 'txID':
+            value = int(modelData['Global'][item])
+            out = 'txID' + ';' + getDeviceID(value)
+            writeLine('\n' + out, '\n' + out)
+            continue
         outDe = str(item) + ';' + str(modelData['Global'][item])
         outEn = str(item) + ';' + str(modelData['Global'][item])
         writeLine('\n' + outDe, '\n' + outEn)
@@ -1282,7 +1302,20 @@ def logswitch(modelData):
         writeLine(out, out)
 
 
-def lua(modelData):
+def lua1(modelData):
+    # fill luaid for display of telemetry screens
+    if 'Lua' not in modelData:
+        return
+    anz = len(modelData['Lua'])
+    if anz == 0:
+        return
+    ind = 1
+    for item in modelData['Lua']:  # is list of dicts
+        luaid[ind] = item['appID']
+        ind += 1
+
+
+def lua2(modelData):
     writeLine('\n\nLua:', '\n\nLua:')
     if 'Lua' not in modelData:
         writeLine('\nkeine Lua App', '\nno Lua App')
@@ -1308,19 +1341,23 @@ def lua(modelData):
             if counter % 3 == 0:
                 out2 = str(dat)
             else:
-                # display switch with direction only if genuine switch, because usage of controls not know for lua app
+                # display switch with direction only if genuine switch
                 sw = getSwitch(str(dat))[2]
                 if sw != '-':
                     if len(out3) == 0:
                         out3 = sw
                     else:
                         out3 = out3 + ';' + sw
+                # display sensor
                 if isinstance(dat, int):
                     if dat in sensordict:
                         if len(out3) == 0:
                             out3 = sensordict[dat][0]
                         else:
                             out3 = out3 + ';' + sensordict[dat][0]
+                # display first parameter of each app if not yet done
+                if counter == 2 and len(out3) == 0:
+                    out3 = str(dat)
             counter += 1
         if len(out3) > 0:
             out = out + ';' + out2 + ';' + out3
@@ -1739,7 +1776,7 @@ def telemdetect(modelData):
 
 def telemvoice(modelData):
     writeLine('\n\nEinzelsprachansagen:', '\n\nSingle voice announcements')
-    if 'Telem-Voice' not in modelData:  # introduced in V4
+    if 'Telem-Voice' not in modelData:  # introduced in Jeti V4
         writeLine('\nkeine Sprachansagen', '\nno voice announcements')
         return
     if len(modelData['Telem-Voice']['Data']) == 0:
@@ -1781,8 +1818,8 @@ def telemvoice(modelData):
                 outDe = sw + ';' + sensordict[key][0] + ';' + sensordict[key][parm]
                 outEn = sw + ';' + sensordict[key][0] + ';' + sensordict[key][parm]
             else:
-                outDe = sw + ';' + 'Sensor fehlt:;' + str(key)
-                outEn = sw + ';' + 'Sensor missing:;' + str(key)
+                outDe = sw + ';' + 'Sensor ' + getDeviceID(key) + ' fehlt'
+                outEn = sw + ';' + 'Sensor ' + getDeviceID(key) + ' missing'
         writeLine('\n' + outDe, '\n' + outEn)
 
 
@@ -2084,11 +2121,12 @@ def extractDict(modelData):
     telemdetect(modelData)          # sets sensordict
     telemvoice(modelData)           # sets sensordict
     telctrl(modelData)              # sets sensordict
-    lua(modelData)                  # sets luaid[] and reads sensordict
+    lua1(modelData)                 # sets luaid[] for telemetry
     displayedtelemetry(modelData)   # reads luaid[] sensordict stopwatch[]
     vario(modelData)                # reads sensordict
     alarms(modelData)               # reads sensordict
     accel(modelData)                # reads hasAccel
+    lua2(modelData)                 # sets luaid[] and reads sensordict
 
     # currently not evaluated
     #mixesvalues(modelData)        # data processed by mixesmain()
@@ -2104,7 +2142,7 @@ def extractDict(modelData):
 # extracts text patterns, so all controls and switches will be found if used or just referenced in logical switch
 # exceptions: switches at start-up position are defined by index
 def extractPat(modelTxt):
-    writeLine('\n\n\nGeber und Schalter:', '\n\n\nControls and switches:')
+    writeLine('\n\n\nzugewiesene Geber und Schalter:', '\n\n\nassigned controls and switches:')
 
     # pattern of switches and controls
     swpat = re.compile("\"-?[0-9]+,-?[0-9]+,-?[0-9]+,-?[0-9]+,-?[0-9]+,-?[0-9]+,-?[0-9]+,-?[0-9]+\"")

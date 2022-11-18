@@ -63,3 +63,6 @@ settings.txt introduced, bugfixes
 2022-01-05:  
 numbering of functions corrected, 
 points pairs of curves displayed below curves, bugfixes
+
+2022-11-18:  
+the first parameter of the Lua functions is displayed as well as all used controllers and switches, bugfixes
