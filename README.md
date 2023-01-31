@@ -66,3 +66,6 @@ points pairs of curves displayed below curves, bugfixes
 
 2022-11-18:  
 the first parameter of the Lua functions is displayed as well as all used controllers and switches, bugfixes
+
+2023-01-31:  
+more transmitter type codes added according to Jeti email

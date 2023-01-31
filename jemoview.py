@@ -17,7 +17,7 @@ import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-version = 'jemoview;version 2022-11-18'
+version = 'jemoview;version 2023-01-31'
 
 aferatg_txt = ['Quer', 'Klappen', 'Höhe', 'Seite', 'Störkl.', 'Drossel', 'Fahrwerk',
                'Ailerons', 'Flaps', 'Elevator', 'Rudder', 'Airbrake.', 'Throttle', 'Gear']
@@ -1119,8 +1119,8 @@ def globalstr(modelData):
     writeLine('\n\nGlobale Einstellungen:', '\n\nGlobal Settings:')
     global hasAccel
     txTyp = { # id: [transmitter-name, hasAccel (as boolean)]
-        652: ['DC-16V2', False],
-        653: ['DS-16V2', True],
+        652: ['DC-16 V2', False],
+        653: ['DS-16 V2', True],
         674: ['DC-16', False],
         675: ['DS-16', True],
         676: ['DS-14', True],
@@ -1128,8 +1128,15 @@ def globalstr(modelData):
         678: ['DC-24', False],
         679: ['DS-24', True],
         680: ['DS-12', True],
-        3857: ['DC-14V2', False],
-        3858: ['DS-14V2', True],
+        3857: ['DC-14 V2', False],
+        3858: ['DS-14 V2', True],
+        3859: ['DC-24', False],
+        3860: ['DS-24', True],
+        3861: ['DC-16 V2', False],
+        3862: ['DS-16 V2', True],
+        3863: ['DC-14 V2', False],
+        3864: ['DS-14 V2', True],
+        3865: ['DS-12', True],
     }
     TxVers = False
     for item in modelData['Global']:
@@ -1142,8 +1149,8 @@ def globalstr(modelData):
                 outEn = '\nTransmitter type' + ';' + txTyp[value][0]
                 hasAccel = txTyp[value][1]
             else:
-                outDe = '\nSender Typ' + ';' + '?zefix?' + str(value)
-                outEn = '\nTransmitter type' + ';' + '?zefix?'
+                outDe = '\nSender Typ' + ';' + str(value) + ';' + 'ist unbekannt' + ';' + '?zefix?'
+                outEn = '\nTransmitter type' + ';' + str(value) + ';' + 'is unknown' + ';' + '?zefix?'
                 zefix(1)
             writeLine(outDe, outEn)
             continue
@@ -2277,9 +2284,9 @@ def selectInput():
 
         if zefix(2) > 0:
             if options['language'] == 'de':
-                out = 'Datenlücke bei Modell\n' + fileName + '\nbitte Modell im jetiforum.de einstellen'
+                out = 'unbekannte Daten in Modell\n' + fileName + '\nbitte Modell im jetiforum.de einstellen'
             else:
-                out = 'Missing data for model\n' + fileName + '\nplease post model at jetiforum.de'
+                out = 'unknown data in model\n' + fileName + '\nplease post model at jetiforum.de'
             print(out)
             tk.messagebox.showinfo(title='jemoview', message=out)
 
