@@ -17,7 +17,7 @@ import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-version = 'jemoview;version 2023-01-31'
+version = 'jemoview;version 2023-08-09'
 
 aferatg_txt = ['Quer', 'Klappen', 'Höhe', 'Seite', 'Störkl.', 'Drossel', 'Fahrwerk',
                'Ailerons', 'Flaps', 'Elevator', 'Rudder', 'Airbrake.', 'Throttle', 'Gear']
@@ -1137,6 +1137,7 @@ def globalstr(modelData):
         3863: ['DC-14 V2', False],
         3864: ['DS-14 V2', True],
         3865: ['DS-12', True],
+        3866: ['DC-24 V2', False],
     }
     TxVers = False
     for item in modelData['Global']:

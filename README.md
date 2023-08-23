@@ -69,3 +69,6 @@ the first parameter of the Lua functions is displayed as well as all used contro
 
 2023-01-31:  
 more transmitter type codes added according to Jeti email
+
+2023-08-09:  
+transmitter type code of DC-24 V2 added from jsn example of a user
