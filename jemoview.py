@@ -6,7 +6,7 @@
 # program extracts all relevant information from an input jeti transmitter file (.jsn)
 # and prints it in a csv format using ';' as standard delimiter, suitable for excel/calc programs
 #
-# Copyright (c) 2020 - 2022, werinza (aka nikolausi / Klaus)
+# Copyright (c) 2020 - 2023, werinza (aka nikolausi / Klaus)
 # All Rights Reserved, Open Source MIT license applies to this program and related works
 #
 
@@ -17,7 +17,9 @@ import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-version = 'jemoview;version 2023-08-09'
+progvers = 'jemoview;version 2023-08-27'
+# append a few extra columns as a hint for Excel (had problems with LUA details)
+progvers += ';3;4;5;6;7;8;9;10;11;12;13;14;15'
 
 aferatg_txt = ['Quer', 'Klappen', 'Höhe', 'Seite', 'Störkl.', 'Drossel', 'Fahrwerk',
                'Ailerons', 'Flaps', 'Elevator', 'Rudder', 'Airbrake.', 'Throttle', 'Gear']
@@ -2268,7 +2270,7 @@ def selectInput():
         # create output
         try:
             with open(filecsv, 'w', encoding='utf-8', errors='replace') as fileout:
-                fileout.write(version)
+                fileout.write(progvers)
                 # extract content of model
                 extractDict(modelData)
                 extractPat(modelTxt)
@@ -2387,7 +2389,7 @@ swsettings = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 
 # create the GUI structures (but do not display yet)
 app = tk.Tk()
-app.title(version)
+app.title(progvers)
 # Create a canvas and frames
 app.geometry('400x370+400+300')
 frameLanguage = tk.Frame(master=app, relief=tk.RIDGE, borderwidth=5)

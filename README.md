@@ -72,3 +72,6 @@ more transmitter type codes added according to Jeti email
 
 2023-08-09:  
 transmitter type code of DC-24 V2 added from jsn example of a user
+
+2023-08-27:  
+a few extra columns appended to line 1 as a hint for Excel (had problems with LUA details)
